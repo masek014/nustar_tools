@@ -1,0 +1,7 @@
+build/
+dist/
+nustar_tools.egg-info/
+__pycache__/
+
+*.bsp
+*.tle

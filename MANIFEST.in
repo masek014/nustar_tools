@@ -1,0 +1,5 @@
+include requirements.txt
+include nustar_tools/plotting/styles/*
+include nustar_tools/mapping/styles/*
+
+recursive-include data *

@@ -1,0 +1,25 @@
+font.size         : 20
+
+figure.figsize    : 8, 8
+figure.dpi        : 240
+savefig.dpi       : 240
+
+axes.titlesize    : 20
+axes.titlepad     : 8
+
+legend.fontsize   : 12
+
+xtick.major.size  : 10
+xtick.minor.size  : 5
+xtick.major.width : 1
+xtick.minor.width : 1
+xtick.major.pad   : 10
+xtick.minor.pad   : 10
+xtick.direction   : in
+ytick.major.size  : 10
+ytick.minor.size  : 5
+ytick.major.width : 1
+ytick.minor.width : 1
+ytick.major.pad   : 10
+ytick.minor.pad   : 10
+ytick.direction   : in

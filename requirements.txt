@@ -1,0 +1,10 @@
+astropy==4.3.post1
+imageio==2.9.0
+matplotlib==3.5.3
+numpy==1.21.1
+parse==1.19.0
+photutils==1.3.0
+regions==0.5
+scipy==1.7.1
+setuptools==49.6.0.post20210108
+sunpy==3.0.1
