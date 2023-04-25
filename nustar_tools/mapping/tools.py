@@ -404,13 +404,10 @@ def set_ticks(ax, b_hide_axes=False):
 
     lon.set_axislabel('x [arcsec]')
     lat.set_axislabel('y [arcsec]')
-    lon.set_ticks(number=6, color='black', size=5)
-    lat.set_ticks(number=6, color='black', size=5)
-    lon.display_minor_ticks(True)
-    lat.display_minor_ticks(True)
-    lon.set_minor_frequency(5)
-    lat.set_minor_frequency(5)
-    ax.tick_params(which='major', direction='in')
+    lon.set_ticks(number=6, color='black')
+    lat.set_ticks(number=6, color='black')
+    lon.set_minor_frequency(4)
+    lat.set_minor_frequency(4)
 
     # Coordinate grid
     lon.grid(color='grey', alpha=0.1, linestyle='solid')

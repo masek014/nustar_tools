@@ -60,6 +60,9 @@ def get_region_pixels(map_, reg):
     return reg_pixels
 
 
+class EmptyPixelArrayError(ValueError): pass
+
+
 class Pixel():
 
     
@@ -138,6 +141,9 @@ class PixelArray():
         for pixel in self.pixels:
             evts.append(pixel.evts)
 
+        if len(evts) < 2:
+            raise EmptyPixelArrayError(f'PixelArray must have two or more photons (found {len(evts)} photons).')
+
         self.evts = vstack(evts)
         self.evts.sort('TIME')
 
@@ -149,7 +155,7 @@ class PixelArray():
         energy_range=None,
         hk_file=None
     ):
-
+        
         if energy_range is not None:
             energy_range = energy_range.value
 
@@ -181,6 +187,7 @@ class PixelArray():
         energy_range=None,
         hk_file=None,
         ax=None,
+        b_normalize=False,
         **kwargs
     ):
 
@@ -199,6 +206,11 @@ class PixelArray():
             hk_file
         )
 
+        if b_normalize:
+            norm = 1/values.max()
+            values *= norm
+            values_err *= norm
+
         fig, ax, line = lightcurves.make_lightcurve_plot(
             time_edges,
             values,
@@ -206,6 +218,9 @@ class PixelArray():
             ax=ax,
             **kwargs
         )
+
+        if b_normalize:
+            ax.set_title(f'Normalized {ax.get_title()}')
 
         return fig, ax
 

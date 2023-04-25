@@ -36,8 +36,10 @@ class RegionSelector():
         out_dir=None
     ):
 
+        if id_dir[-1] != '/':
+            id_dir = id_dir + '/'
         self.id_dir = id_dir
-        self.id_num = utilities.get_id_from_id_dir(id_dir)
+        self.id_num = id_dir.split('/')[-2]
         self.fpm = fpm
         self.out_dir = out_dir
         self._set_data_files(b_livetime_correction)
@@ -188,7 +190,13 @@ class RegionSelector():
 
 
     def _make_pixel_array(self):
-        self.pixel_array = pa.PixelArray(self.evt_data, self.hdr, map_=self._nustar_map, region=self.region)
+        
+        if self.region is not None:
+            map_ = self._region_map
+        else:
+            map_ = self._nustar_map
+            
+        self.pixel_array = pa.PixelArray(self.evt_data, self.hdr, map_=map_, region=self.region)
 
 
     def _make_title(self, plot_type):
@@ -215,10 +223,16 @@ class RegionSelector():
 
 
     def set_region(self, region_label, RegionClass, center, **kwargs):
+        """
+        We need to keep track of _region_map since sky-to-pixel conversions
+        cannot work for regions at the limb if the region and map have
+        different observers.
+        """
 
+        self._region_map = self._nustar_map
         self.region_label = region_label
         self.region = RegionClass(
-            center=SkyCoord(*center, frame=self._nustar_map.coordinate_frame),
+            center=SkyCoord(*center, frame=self._region_map.coordinate_frame),
             **kwargs
         )
         self._make_pixel_array()
@@ -377,7 +391,11 @@ class RegionSelector():
         colors = np.linspace(step, 1-step, len(energy_ranges))
 
         for color, energy_range in zip(colors, energy_ranges):
-            self.set_energy_range(energy_range)
+            try:
+                self.set_energy_range(energy_range)
+            except pa.EmptyPixelArrayError as e:
+                print(f'WARNING [plot_stacked_lightcurve]: {e} Skipping energy range {energy_range}')
+                continue
             fig, ax = self.pixel_array.plot_lightcurve(
                 frame_length,
                 self._nustar_times,
@@ -417,7 +435,7 @@ class RegionSelector():
             frame_length=frame_length,
             fig=fig,
             ax=ax_lc,
-            title=f'Region lightcurve',
+            title=f'Region lightcurve ({frame_length}s bins)',
             lw=2
         )
         if energy_ranges is None:
@@ -552,7 +570,7 @@ class RegionSelector():
         arr = arr[arr[:,0].argsort()] # Sort by timestamp
 
         np.savetxt(
-            f'{self.out_dir}{self.region_label}_lcdata_{frame_length}s_{self._param_str}.csv',
+            f'{self.out_dir}{self.region_label}_lightcurve_{frame_length}s_{self._param_str}.csv',
             arr,
             fmt=['%.5f']*len(columns),
             delimiter=',',
