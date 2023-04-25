@@ -15,7 +15,7 @@ STYLES_DIR = f'{utilities.os.path.dirname(utilities.os.path.realpath(__file__))}
 
 
 def apply_style():
-    plt.style.use(f'{STYLES_DIR}plot.mplstyle')
+    plt.style.use(f'{STYLES_DIR}lightcurve.mplstyle')
 
 
 def apply_colorbar(fig, ax, width=0.005, **kwargs):

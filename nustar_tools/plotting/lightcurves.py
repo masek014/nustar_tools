@@ -413,6 +413,7 @@ def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
     ax.set_title(title_str)
 
     if not axes_position:
+        print(fig_dir + file_name)
         ptools.save_plot(fig, fig_dir, file_name)
 
     return fig, ax
@@ -429,6 +430,4 @@ def generate_lightcurves(id_dir, frame_length=10, energy_range=(2.5,10), axes_po
         utilities.gunzip_file(evt_file + '.gz')
         utilities.gunzip_file(hk_file + '.gz')
         make_observation_lightcurve(evt_file, hk_file, frame_length,
-            energy_range, axes_position, fig_dir=id_dir, file_name=f'lightcurve_{fpm}')
-
-
+            energy_range, axes_position, fig_dir=id_dir+'/figures/', file_name=f'lightcurves{fpm}')

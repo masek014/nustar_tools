@@ -37,8 +37,8 @@ def deconvolve(nustar_map, psf_file, source_position, oa_position, it=10, clip=F
     oa_x, oa_y = oa_position
     
     dist = np.sqrt( (source_x - oa_x)**2 + (source_y - oa_y)**2 ) << u.arcmin
-    angle = np.arctan((source_y - oa_y).value / (source_x - oa_x).value) * u.rad << u.deg
-    angle = np.abs(angle)
+    angle = -1 * np.arctan((source_y - oa_y).value / (source_x - oa_x).value) * u.rad << u.deg
+    # We multiply by -1 since the rotation needs to be counter-clockwise w.r.t. the OA-source vector.
 
     # The index specifying the PSF array to use since there are 18 arrays for
     # different distances.

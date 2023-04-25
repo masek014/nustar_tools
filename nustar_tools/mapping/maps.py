@@ -479,8 +479,8 @@ def generate_maps(id_dir):
     obs_id = utilities.get_id_from_id_dir(id_dir)
 
     # Make maps for both FPMs.
-    plot_observation_map(f'{id_dir}event_cl/nu{obs_id}A06_cl_sunpos.evt', fig_dir=fig_dir)
-    plot_observation_map(f'{id_dir}event_cl/nu{obs_id}B06_cl_sunpos.evt', fig_dir=fig_dir)
+    plot_observation_map(f'{id_dir}event_cl/nu{obs_id}A06_cl_sunpos.evt', fig_dir=fig_dir, file_name='observation_mapA')
+    plot_observation_map(f'{id_dir}event_cl/nu{obs_id}B06_cl_sunpos.evt', fig_dir=fig_dir, file_name='observation_mapB')
 
     
 class FOV():

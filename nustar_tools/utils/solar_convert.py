@@ -26,7 +26,7 @@ def convert_to_solar_coords(in_file):
     
     # Only do the conversion if the output file does not exist.
     if not isfile(out_file):
-        print('Converting ' + in_file + ' to solar coordinates')
+        print(f'Converting {in_file} to solar coordinates')
         evtdata, hdr = utilities.get_event_data(in_file, b_filter_far_data=False)
         importlib.reload(convert)
         (newdata, newhdr) = convert.to_solar(evtdata, hdr)

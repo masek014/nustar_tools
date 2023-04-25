@@ -65,7 +65,7 @@ def plot_exposure_maps(evt_data, hdr, spec_region=None,
     if b_plot_detmap:
         fig_size = fig.get_size_inches()
         fig_size[0] = fig_size[0]*2.4
-        fig = mtools.plt.figure(figsize=fig_size)
+        fig = mtools.plt.figure(figsize=fig_size, constrained_layout=True)
 
     # Plot the count data.
     ax1 = fig.add_subplot(1, int(b_plot_detmap)+1, 1, projection=nustar_submap)

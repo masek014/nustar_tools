@@ -101,9 +101,9 @@ def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
                 vs = contour.get_paths()[0].vertices
                 x = vs[:,0]
                 y = vs[:,1]
-                area = 0.5*np.sum(y[:-1]*np.diff(x) - x[:-1]*np.diff(y))
+                area = 0.5*np.sum(y[:-1]*np.diff(x) - x[:-1]*np.diff(y)) * (u.pix)**2
                 area = np.abs(area)*cdelt*cdelt
-                print(f'level{levels[i]} area: {area}')
+                print(f'{levels[i]}%: {area.value:.02f}')
                 areas += (f'{area.value:0.2f},')
             else:
                 areas += 'nan,'
