@@ -595,7 +595,10 @@ def get_id_from_id_dir(id_dir):
     Returns a string containing the data ID from the provided ID directory.
     """
 
-    return parse.parse(ID_DIR_PATH_FORMAT, id_dir)['id_num']
+    # return parse.parse(ID_DIR_PATH_FORMAT, id_dir)['id_num']
+    path = os.path.normpath(id_dir)
+    return path.split(os.sep)[-1]
+    
 
 
 def get_date_from_id_dir(id_dir):

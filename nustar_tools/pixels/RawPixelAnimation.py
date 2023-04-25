@@ -64,12 +64,12 @@ class RawPixelAnimation():
 
             return self.mats
 
-        date = utilities.get_date_from_id_dir(self.id_dir)
+        date = utilities.convert_nustar_time_to_datetime(self.start).strftime('%Y%m%d')
         file_name = f'{out_dir}/{date}_{self.id_num}_fpm{self.fpm}_{self.time_step}_{self.frame_length}_rawpixels.mp4'
 
         anim = animation.FuncAnimation(self.fig, update_mats,
             fargs=(self,), frames=self.end_frame, interval=1, blit=True)
-        FFwriter = animation.FFMpegWriter(fps=fps)
+        FFwriter = animation.FFMpegWriter(fps=fps, codec='mpeg4')
         anim.save(file_name, dpi=dpi, writer=FFwriter)
 
 
@@ -161,7 +161,7 @@ class RawPixelAnimationCentroid(RawPixelAnimation):
 
             return self.mats
 
-        date = utilities.get_date_from_id_dir(self.id_dir)
+        date = utilities.convert_nustar_time_to_datetime(self.start).strftime('%Y%m%d')
         file_name = f'{out_dir}/{date}_{self.id_num}_{self.time_step}_{self.frame_length}_rawpixels_centroid.mp4'
             
         anim = animation.FuncAnimation(self.fig, update_mats, init_func=init_animation,
