@@ -11,7 +11,7 @@ from nustar_tools.mapping import maps
 from nustar_tools.utils import utilities
 from nustar_tools.pixels.PixelArray import PixelArray
 
-import pha_manipulation as pm
+from . import pha_manipulation as pm
 
 
 PILEUP_GRADE_CORRECTIONS = {
