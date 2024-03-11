@@ -65,4 +65,4 @@ def deconvolve(nustar_map, psf_file, source_position, oa_position, it=10, clip=F
         filter_epsilon=1
     )
     
-    return deconv
+    return deconv, psf_array

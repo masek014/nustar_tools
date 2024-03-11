@@ -1,14 +1,12 @@
 import gc
 import os
+import matplotlib.pyplot as plt
 # import matplotlib
 # matplotlib.use('Agg') # Removes warning when running script: https://stackoverflow.com/q/34770694
 
 from . import livetime
 from . import tools as ptools
-
-
-plt = ptools.plt
-utilities = ptools.utilities
+from ..utils import utilities
 
 CONF_FILE = utilities.CONF_FILE
 LTCV_CONFIG = {
@@ -205,8 +203,12 @@ def make_lightcurve_plot(
     dt_times = [utilities.convert_nustar_time_to_datetime(t) for t in time_edges]
     line = ax.stairs(values, dt_times, **kwargs)
     if values_err is not None:
+        if 'color' in kwargs:
+            color = kwargs['color']
+        else:
+            color = None
         dt_times = [utilities.convert_nustar_time_to_datetime(t) for t in time_edges]
-        ax.fill_between(dt_times[:-1], values-values_err, values+values_err, step='post', color='k', alpha=0.15)
+        ax.fill_between(dt_times[:-1], values-values_err, values+values_err, step='post', color=color, alpha=0.15)
 
     # Configure the title.
     start_yyyymmdd, start_hhmmss = dt_times[0].strftime(utilities.DATE_STR_FORMAT).split(' ')

@@ -1,11 +1,13 @@
+import astropy.units as u
+import datetime
+import matplotlib
+import matplotlib.animation as animation
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
+import numpy as np
 import os
 import photutils
-import numpy as np
 import ruptures as rpt
-import astropy.units as u
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-import matplotlib.animation as animation
 
 from astropy.io import fits
 from astropy.table import QTable
@@ -317,7 +319,11 @@ class CoordinateTracker():
         self._coords = self._coords[obs_inds]
     
 
-    def read_data(self, time_range: list = None, by: int = 1):
+    def read_data(
+        self,
+        time_range: list[datetime.datetime, datetime.datetime] = None,
+        by: int = 1
+    ):
 
         if 'TIME' in self.data_keys:
             self.data_keys.remove('TIME')
@@ -403,19 +409,26 @@ class CoordinateTracker():
 
     def coordinate_timeseries(
         self,
-        ax: plt.axis,
+        ax: matplotlib.axes.Axes,
         which_coord: str,
         b_cpd: bool = False,
-        **set_kwargs: dict
+        plot_kwargs: dict = {},
+        set_kwargs: dict = {}
     ):
         
-        default_kwargs = {
+        default_plot_kwargs = {
+            'color': 'black',
+            'lw': 0.75
+        }
+
+        default_set_kwargs = {
             'xlim': [self.times[0], self.times[-1]],
             'xlabel': 'Time',
             'ylabel': f'{which_coord.upper()} ({self.y.unit})'
         }
 
-        set_kwargs = {**default_kwargs, **set_kwargs}
+        plot_kwargs = {**default_plot_kwargs, **plot_kwargs}
+        set_kwargs = {**default_set_kwargs, **set_kwargs}
 
         which_coord = which_coord.lower()
         if which_coord == 'x':
@@ -425,9 +438,7 @@ class CoordinateTracker():
         elif which_coord == 'z':
             coord = self.z
 
-        line = ax.plot(self.times, coord, color='black', linewidth=0.75,
-            # marker='o', markersize=2
-        )
+        line = ax.plot(self.times, coord, **plot_kwargs)
         ptools.set_x_ticks(ax)
         ptools.set_y_ticks(ax)
         ax.tick_params(axis='x', which='both', direction='in', top=True)
@@ -502,11 +513,11 @@ class CoordinateTracker():
         self.coordinate_scatter(ax0, b_add_hist=False)
 
         ax1 = fig.add_subplot(gs[1,0], sharex=shared_ax)
-        self.coordinate_timeseries(ax1, 'x', xlabel='', xticklabels=[])
+        self.coordinate_timeseries(ax1, 'x', set_kwargs=dict(xlabel='', xticklabels=[]))
         # shared_ax = ax1
 
         ax2 = fig.add_subplot(gs[2,0], sharex=shared_ax)
-        self.coordinate_timeseries(ax2, 'y', xlabel='')
+        self.coordinate_timeseries(ax2, 'y', set_kwargs=dict(xlabel=''))
 
         if b_add_fft:
             ax3 = fig.add_subplot(gs[3,0])
@@ -569,7 +580,17 @@ class AttitudeTracker(CoordinateTracker):
         self._coords['POINTING'][:,1] = y
 
 
-    def coordinate_timeseries(self, ax, which_coord, **kwargs):
+    def coordinate_timeseries(
+        self,
+        ax: matplotlib.axes.Axes,
+        which_coord: str,
+        plot_kwargs: dict = {},
+        set_kwargs: dict = {}
+    ):
+        """
+        which_coord specifies the X, Y, and Z coordinate, which denote
+        the RA, Dec, and Angle of the attitude.
+        """
 
         which_coord = which_coord.lower()
         if which_coord == 'x':
@@ -579,17 +600,25 @@ class AttitudeTracker(CoordinateTracker):
         elif which_coord == 'z':
             label = 'Angle'
 
-        default_kwargs = {
+        default_set_kwargs = {
             'xlabel': 'Time',
             'ylabel': f'{label} ({self.y.unit})'
         }
 
-        kwargs = {**default_kwargs, **kwargs}
-        super().coordinate_timeseries(ax, which_coord, **kwargs)
+        set_kwargs = {**default_set_kwargs, **set_kwargs}
+        super().coordinate_timeseries(
+            ax,
+            which_coord,
+            plot_kwargs=plot_kwargs,
+            set_kwargs=set_kwargs
+        )
 
 
-    def make_overview(self, suptitle: str = 'Attitude Tracker Overview',
-                      b_add_fft: bool = True):
+    def make_overview(
+        self,
+        suptitle: str = 'Attitude Tracker Overview',
+        b_add_fft: bool = True
+    ) -> matplotlib.figure.Figure:
 
         ptools.apply_style()
 
@@ -618,13 +647,13 @@ class AttitudeTracker(CoordinateTracker):
         self.coordinate_scatter(ax0, b_add_hist=False)
 
         ax1 = fig.add_subplot(gs[1,0], sharex=shared_ax)
-        self.coordinate_timeseries(ax1, 'x', xlabel='', xticklabels=[])
+        self.coordinate_timeseries(ax1, 'x', set_kwargs=dict(xlabel='', xticklabels=[]))
 
         ax2 = fig.add_subplot(gs[2,0], sharex=shared_ax)
-        self.coordinate_timeseries(ax2, 'y', xlabel='', xticklabels=[])
+        self.coordinate_timeseries(ax2, 'y', set_kwargs=dict(xlabel='', xticklabels=[]))
 
         ax3 = fig.add_subplot(gs[3,0], sharex=shared_ax)
-        self.coordinate_timeseries(ax3, 'z', xlabel='')
+        self.coordinate_timeseries(ax3, 'z', set_kwargs=dict(xlabel=''))
 
         if b_add_fft:
             ax4 = fig.add_subplot(gs[4,0])

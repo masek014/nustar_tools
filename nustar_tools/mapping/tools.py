@@ -103,14 +103,16 @@ def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
                 y = vs[:,1]
                 area = 0.5*np.sum(y[:-1]*np.diff(x) - x[:-1]*np.diff(y)) * (u.pix)**2
                 area = np.abs(area)*cdelt*cdelt
-                print(f'{levels[i]}%: {area.value:.02f}')
+                # print(f'{levels[i]}%: {area.value:.02f}')
                 areas += (f'{area.value:0.2f},')
             else:
                 areas += 'nan,'
 
         areas = areas[:-1]
-        with open(f'{out_dir}contours.txt', 'w') as outfile:
-            outfile.write(areas)
+        # with open(f'{out_dir}contours.txt', 'w') as outfile:
+            # outfile.write(areas)
+        
+        return areas
 
 
 def rebin_data(in_map, new_size):
@@ -142,7 +144,7 @@ def apply_gaussian_blur(in_map, std_dev=1.0):
     return sunpy.map.Map(ndimage.gaussian_filter(in_map.data, std_dev, mode='nearest'), in_map.meta)
 
 
-def apply_contour(submap, dmin, dmax):
+def apply_contour(submap, cmap, dmin, dmax):
     """
     Applies contour lines to the map.
 
@@ -163,7 +165,7 @@ def apply_contour(submap, dmin, dmax):
     cm2 = mplcolors.LinearSegmentedColormap.from_list('simple', [(1,1,1),(1,1,1)], N=2)
 
     # Setup up the map norm and colors and contour colours.
-    submap.plot_settings['cmap'] = cm.get_cmap('plasma')
+    submap.plot_settings['cmap'] = cm.get_cmap(cmap)
     submap.plot_settings['norm'] = mplcolors.LogNorm(vmin=dmin,vmax=dmax)
     submap2.plot_settings['cmap'] = cm2
 
@@ -213,7 +215,7 @@ def apply_colorbar(fig, ax, width=0.005, **kwargs):
 
 
 def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
-    cmap=plt.cm.get_cmap('jet'), label=''):
+    cmap=plt.cm.get_cmap('jet'), width=0.05, format='%li', label=''):
     """
     Adds a colorbar to the map plot.
     A new axes object is created to house the colorbar.
@@ -249,9 +251,9 @@ def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
     bounds = np.linspace(cb_min-step, cb_max+step, num_segments+1)
     norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
 
-    cbax, cb = apply_colorbar(fig, ax,
+    cbax, cb = apply_colorbar(fig, ax, width=width,
         norm=norm, label=label, cmap=cmap,
-        ticks=ticks, boundaries=bounds, format='%li')
+        ticks=ticks, boundaries=bounds, format=format)
 
     return cbax, cb
 
@@ -402,8 +404,8 @@ def set_ticks(ax, b_hide_axes=False):
     lon = ax.coords[0]
     lat = ax.coords[1]
 
-    lon.set_axislabel('x [arcsec]')
-    lat.set_axislabel('y [arcsec]')
+    lon.set_axislabel('X [arcsec]')
+    lat.set_axislabel('Y [arcsec]')
     lon.set_ticks(number=6, color='black')
     lat.set_ticks(number=6, color='black')
     lon.set_minor_frequency(4)
@@ -482,6 +484,7 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
     """
 
     default_kwargs = {
+        'width': 0.02,
         'cmap': 'plasma',
         'norm': mplcolors.LogNorm(np.min(nustar_map.data[nustar_map.data!=0]), np.max(nustar_map.data)),
         'label': nustar_map.meta['pixlunit']
@@ -509,13 +512,13 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
     if b_blur:
         nustar_submap = apply_gaussian_blur(nustar_submap, blur_size)
     if b_contours:
-        apply_contour(nustar_submap, cb_kwargs['norm'].vmin, cb_kwargs['norm'].vmax)
+        apply_contour(nustar_submap, cb_kwargs['cmap'], cb_kwargs['norm'].vmin, cb_kwargs['norm'].vmax)
     else:
         # Use a different, easier to see color scheme if there is no contour.
         nustar_submap.plot(norm=cb_kwargs['norm'], cmap=cb_kwargs['cmap'])
     
     # Draw the solar limb
-    nustar_submap.draw_limb(color='black', linewidth=1.25, linestyle='dotted', zorder=0)
+    # nustar_submap.draw_limb(color='black', linewidth=1.25, linestyle='dotted', zorder=0)
     
     set_ticks(ax, b_hide_axes)
     add_overlay(ax)
@@ -525,7 +528,7 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
     ax.set_title('NuSTAR ' + title_obsdate)
 
     if b_colorbar:
-        apply_colorbar(fig, ax, width=0.02, **cb_kwargs)
+        apply_colorbar(fig, ax, **cb_kwargs)
 
     return nustar_submap, fig, ax, corners
 

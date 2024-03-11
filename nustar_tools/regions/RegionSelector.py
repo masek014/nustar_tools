@@ -22,18 +22,24 @@ LIGHTCURVE_STYLES_DIR = ptools.STYLES_DIR
 MAP_STYLES_DIR = mtools.STYLES_DIR
 PSF_FILE = '/home/reed/Documents/research/nustar/psf/nuA2dpsfen1_20100101v001.fits' # TODO: Remove this?
 
+FPM_CMAPS = dict(
+    A = 'Greys',
+    B = 'Reds'
+)
+
 
 class RegionSelector():
 
 
     def __init__(
         self,
-        id_dir,
-        fpm,
-        time_range=None,
-        energy_range=(0,79)*u.keV,
-        b_livetime_correction=True,
-        out_dir=None
+        id_dir: str,
+        fpm: str,
+        time_range: tuple[str, str] = None,
+        energy_range: tuple[float, float] = (0,79)*u.keV,
+        grade_range: tuple[int, int] = (0, 32),
+        b_livetime_correction: bool = True,
+        out_dir: str= None,
     ):
 
         if id_dir[-1] != '/':
@@ -50,6 +56,7 @@ class RegionSelector():
             self.time_range = Time(time_range)
 
         self.energy_range = energy_range
+        self.grade_range = grade_range
         self.pixel_array = None
         self.region = None
         self.region_label = 'no_region'
@@ -121,6 +128,8 @@ class RegionSelector():
                 id_num=self.id_num,
                 fpm=self.fpm
             )
+        else:
+            self.hk_file = None
 
 
     def _read_data(self):
@@ -129,8 +138,8 @@ class RegionSelector():
         self._energy_filter()
 
         if self.time_range is None:
-            start = utilities.convert_nustar_time_to_astropy(self.evt_data['time'][0])
-            end = utilities.convert_nustar_time_to_astropy(self.evt_data['time'][-1])
+            start = utilities.convert_nustar_time_to_astropy(self.evt_data['TIME'][0])
+            end = utilities.convert_nustar_time_to_astropy(self.evt_data['TIME'][-1])
             self.time_range = (start, end)
             print('Time range not specified. Found time range:', start, end)
 
@@ -139,6 +148,13 @@ class RegionSelector():
 
         inds = utilities.nustar.filter.by_energy(self._full_evt_data, *self.energy_range.value)
         self.evt_data = self._full_evt_data[inds]
+        self._grade_filter()
+
+    
+    def _grade_filter(self):
+
+        inds = (self.evt_data['GRADE'] >= self.grade_range[0]) & (self.evt_data['GRADE'] <= self.grade_range[1])
+        self.evt_data = self.evt_data[inds]
 
 
     def _make_map(self):
@@ -196,7 +212,12 @@ class RegionSelector():
         else:
             map_ = self._nustar_map
             
-        self.pixel_array = pa.PixelArray(self.evt_data, self.hdr, map_=map_, region=self.region)
+        self.pixel_array = pa.PixelArray(
+            self.evt_data,
+            self.hdr,
+            map_=map_,
+            region=self.region
+        )
 
 
     def _make_title(self, plot_type):
@@ -204,14 +225,14 @@ class RegionSelector():
         t1 = self.time_range[0].strftime(f'{DATE_FORMAT} {TIME_FORMAT}')
         t2 = self.time_range[1].strftime(TIME_FORMAT)
 
-        return f'{plot_type} NuSTAR FPM{self.fpm} {t1}-{t2}, '\
+        return f'{plot_type} NuSTAR FPM {self.fpm} {t1}-{t2}, '\
             f'{self.energy_range[0]} - {self.energy_range[1]}'
 
 
     def save_fig(self, fig_type):
 
         utilities.create_directory(self.out_dir)
-        plt.savefig(f'{self.out_dir}{self.region_label}_{fig_type}_{self._param_str}.png', dpi=240, bbox_inches='tight')
+        plt.savefig(f'{self.out_dir}{self.region_label}_{fig_type}_{self._param_str}.png', bbox_inches='tight')
 
 
     def set_energy_range(self, energy_range):
@@ -276,8 +297,6 @@ class RegionSelector():
         )
         map_kw = {**default_map_kw, **map_kw}
 
-        plt.style.use(f'{MAP_STYLES_DIR}/map.mplstyle')
-
         nustar_map = maps.make_nustar_map(self.evt_data, self.hdr)
         nustar_submap, fig, ax, _ = mtools.apply_map_settings(
             nustar_map,
@@ -292,7 +311,8 @@ class RegionSelector():
 
         return fig, ax, nustar_submap
     
-
+    
+    # TODO: Add diagnostic image/figure showing the OA and source positions, the PSF array, num. iterations (etc.?).
     def plot_deconvolved_map(
         self,
         psf_file=PSF_FILE,
@@ -313,7 +333,7 @@ class RegionSelector():
         )
         map_kw = {**default_map_kw, **map_kw}
 
-        plt.style.use(f'{MAP_STYLES_DIR}/map.mplstyle')
+        # plt.style.use(f'{MAP_STYLES_DIR}/map.mplstyle')
 
         oa_tracker = ct.OpticalAxisTracker(self.id_dir, self.fpm)
         oa_tracker.read_data(self.time_range)
@@ -324,7 +344,7 @@ class RegionSelector():
         nustar_map = maps.make_nustar_map(self.evt_data, self.hdr)
         submap = mtools.get_submap(nustar_map, map_kw['corners'])
 
-        deconv_data = deconvolve(submap, psf_file, source_position, oa_position, it=iterations)
+        deconv_data, psf_array = deconvolve(submap, psf_file, source_position, oa_position, it=iterations)
         submap.data[:] = deconv_data
 
         submap, fig, ax, _ = mtools.apply_map_settings(
@@ -333,10 +353,16 @@ class RegionSelector():
             index=index,
             **map_kw
         )
-        ax.set_title(self._make_title(f'Deconvolved {iterations} it.,'))
+        ax.set_title(self._make_title(f'Deconvolved {iterations} it.,\n'))
         self.plot_region(ax, submap, **region_kw)
         
-        return fig, ax, submap
+        deconv_params = dict(
+            oa_position=oa_position,
+            source_position=source_position,
+            psf_array=psf_array
+        )
+
+        return fig, ax, submap, deconv_params
         
 
     def plot_exposure_map(self):
@@ -354,14 +380,14 @@ class RegionSelector():
 
     def make_lightcurve(self, frame_length):
         
-        time_edges, values = self.pixel_array.make_lightcurve(
+        time_edges, values, values_err = self.pixel_array.make_lightcurve(
             frame_length,
             self._nustar_times,
             self.energy_range,
             self.hk_file
         )
 
-        return time_edges, values
+        return time_edges, values, values_err
 
 
     def plot_lightcurve(self, frame_length, ax=None, **kwargs):
@@ -386,10 +412,18 @@ class RegionSelector():
 
     def plot_stacked_lightcurve(self, frame_length, energy_ranges, ax=None, **kwargs):
 
+        default_kwargs = dict(
+            cmap=FPM_CMAPS[self.fpm]
+        )
+        kwargs = {**default_kwargs, **kwargs}
+
         orig_energy_range = self.energy_range
         step = 1 / (len(energy_ranges) + 1)
-        colors = np.linspace(step, 1-step, len(energy_ranges))
 
+        cmap = plt.get_cmap(kwargs.pop('cmap'))
+        colors = cmap(np.linspace(step, 1-step, len(energy_ranges)))
+        colors = reversed(colors)
+        
         for color, energy_range in zip(colors, energy_ranges):
             try:
                 self.set_energy_range(energy_range)
@@ -402,7 +436,7 @@ class RegionSelector():
                 energy_range,
                 self.hk_file,
                 ax=ax,
-                color=str(color),
+                color=color,
                 label=f'{energy_range[0].value} - {energy_range[1].value} keV',
                 **kwargs
             )
@@ -414,7 +448,7 @@ class RegionSelector():
         return fig, ax
 
 
-    def plot_combined(self, frame_length, energy_ranges=None):
+    def plot_combined(self, frame_length, energy_ranges=None, lc_kwargs={}):
 
         fig = plt.figure(figsize=(10,14), layout='constrained')
         gs = fig.add_gridspec(2, 1,
@@ -431,13 +465,14 @@ class RegionSelector():
             lc_unit = 'Counts'
         else:
             lc_unit = 'Counts/s'
-        lc_kwargs = dict(
+        lc_kwargs_default = dict(
             frame_length=frame_length,
             fig=fig,
             ax=ax_lc,
             title=f'Region lightcurve ({frame_length}s bins)',
             lw=2
         )
+        lc_kwargs = {**lc_kwargs_default, **lc_kwargs}
         if energy_ranges is None:
             lightcurve_method = self.plot_lightcurve
         else:

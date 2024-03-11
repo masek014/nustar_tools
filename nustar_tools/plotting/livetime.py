@@ -1,6 +1,7 @@
+import astropy.units as u
+
 from . import tools as ptools
-utilities = ptools.utilities
-u = utilities.u
+from ..utils import utilities
 
 
 DATA_EXTENSIONS = ['A_fpm.hk.gz', 'B_fpm.hk.gz'] # File extensions of the zipped livetime data

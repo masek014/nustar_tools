@@ -1,9 +1,15 @@
-import os
-import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-from astropy.table import Table, vstack
-from regions import PixCoord
+import numpy as np
+import os
+import sunpy.map
+
+from astropy.io import fits
+from astropy.table import Table, Column, vstack
+from regions import PixCoord, SkyRegion
+
+from dataclasses import dataclass
 
 import nustar_pysolar as nustar
 
@@ -14,7 +20,10 @@ from ..plotting import lightcurves
 STYLES_DIR = os.path.dirname(os.path.realpath(lightcurves.__file__)) + '/styles/'
 
 
-def merge_det_arrs(det_arrs, b_normalize=True):
+def merge_det_arrs(
+    det_arrs: list[np.ndarray],
+    b_normalize: bool = True
+) -> np.ndarray:
     """
     Combines the detector arrays into a single array.
     Each quadrant it normalized with respect to itself.
@@ -36,7 +45,7 @@ def merge_det_arrs(det_arrs, b_normalize=True):
     return arr
 
 
-def get_region_pixels(map_, reg):
+def get_region_pixels(map_: sunpy.map.Map, reg: SkyRegion) -> np.ndarray:
     """
     Returns the coordinates of the pixels within the region in an
     [n, 2] numpy array, where n is the number of rows equal to the
@@ -63,13 +72,10 @@ def get_region_pixels(map_, reg):
 class EmptyPixelArrayError(ValueError): pass
 
 
-class Pixel():
-
-    
-    def __init__(self, coord, evts):
-
-        self.coord = coord
-        self.evts = evts
+@dataclass
+class Pixel:
+    coord: PixCoord
+    evts: Table
 
 
 class PixelArray():
@@ -77,13 +83,14 @@ class PixelArray():
     
     def __init__(
         self,
-        evt_data,
-        hdr,
-        x_key='X',
-        y_key='Y',
-        keep_cols=['GRADE', 'PI'],
-        map_=None,
-        region=None,
+        evt_data: Table | fits.fitsrec.FITS_rec,
+        hdr: fits.header.Header,
+        x_key: str = 'X',
+        y_key: str = 'Y',
+        keep_cols: list[str] = ['PI'],
+        map_: sunpy.map.Map = None,
+        region: SkyRegion = None,
+        filters: dict = {}
     ):
 
         self.hdr = hdr
@@ -94,8 +101,17 @@ class PixelArray():
         
         self.evt_data = Table(evt_data)
         self.evt_data.keep_columns(
-            ['TIME', 'DET_ID', 'X', 'Y', x_key, y_key] + keep_cols
+            ['TIME', 'DET_ID', 'X', 'Y', 'GRADE', x_key, y_key] + keep_cols
         )
+
+        for col, col_range in filters.items():
+            inds = (self.evt_data[col] >= col_range[0]) & (self.evt_data[col] <= col_range[1])
+            self.evt_data = self.evt_data[inds]
+
+        if len(self.evt_data) < 2:
+            raise EmptyPixelArrayError('Filter removed all events from the '
+                                       'table. Please loosen the filter.')
+
         self.time_range = (
             utilities.convert_nustar_time_to_astropy(self.evt_data['TIME'][0]),
             utilities.convert_nustar_time_to_astropy(self.evt_data['TIME'][-1])
@@ -105,12 +121,13 @@ class PixelArray():
         self._combine_evts()
 
 
-    def _get_pixel_data(self):
+    def _get_pixel_data(self) -> tuple[np.ndarray, Column, Column]:
 
         X, Y = self.evt_data[self.x_key], self.evt_data[self.y_key]
         if self.region is None:
             coords = np.array([X,Y]).T
-            pixel_coords = np.vstack({tuple(row) for row in coords})
+            pixel_coords = np.vstack([tuple(row) for row in coords])
+            pixel_coords = np.unique(pixel_coords, axis=0)
         else:
             X, Y = self.evt_data['X'], self.evt_data['Y']
             pixel_coords = get_region_pixels(self.map_, self.region)
@@ -118,7 +135,7 @@ class PixelArray():
             y_within = (Y > np.min(pixel_coords[:,1])) & (Y < np.max(pixel_coords[:,1]))
             self.evt_data = self.evt_data[x_within & y_within]
             X, Y = self.evt_data[self.x_key], self.evt_data[self.y_key]
-
+        
         return pixel_coords, X, Y
     
     
@@ -150,12 +167,12 @@ class PixelArray():
 
     def make_lightcurve(
         self,
-        frame_length,
-        time_range=None,
-        energy_range=None,
-        hk_file=None
-    ):
-        
+        frame_length: float,
+        time_range: tuple[float, float] = None,
+        energy_range: tuple[float, float] = None,
+        hk_file: str = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+
         if energy_range is not None:
             energy_range = energy_range.value
 
@@ -182,14 +199,15 @@ class PixelArray():
 
     def plot_lightcurve(
         self,
-        frame_length,
-        time_range=None,
-        energy_range=None,
-        hk_file=None,
-        ax=None,
-        b_normalize=False,
+        frame_length: float,
+        time_range: tuple[float, float] = None,
+        energy_range: tuple[float, float] = None,
+        hk_file: str = None,
+        ax: matplotlib.axes.Axes = None,
+        b_show_error: bool = True,
+        b_normalize: bool = False,
         **kwargs
-    ):
+    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
 
         default_kwargs = dict(
             color='black',
@@ -207,9 +225,13 @@ class PixelArray():
         )
 
         if b_normalize:
-            norm = 1/values.max()
-            values *= norm
+            norm = 1/np.nanmax(values)
+            values -= np.nanmin(values)
+            values = norm * values
             values_err *= norm
+
+        if not b_show_error:
+            values_err = None
 
         fig, ax, line = lightcurves.make_lightcurve_plot(
             time_edges,
@@ -228,11 +250,19 @@ class PixelArray():
 class RawPixelArray(PixelArray):
 
     
-    def __init__(self, evt_data, hdr, keep_cols=['GRADE', 'PI'], map_=None, region=None):
-        super().__init__(evt_data, hdr, 'RAWX', 'RAWY', keep_cols, map_, region)
+    def __init__(
+            self,
+            evt_data: Table | fits.fitsrec.FITS_rec,
+            hdr: fits.header.Header,
+            keep_cols: list[str] = ['GRADE', 'PI'],
+            map_: sunpy.map.Map = None,
+            region: SkyRegion = None,
+            filters: dict = {}
+        ):
+        super().__init__(evt_data, hdr, 'RAWX', 'RAWY', keep_cols, map_, region, filters)
 
 
-    def make_det_counts(self, time_range=None):
+    def make_det_counts(self, time_range: tuple[float, float] = None) -> np.ndarray:
 
         if time_range is None:
             time_range = self.time_range
