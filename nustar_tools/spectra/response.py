@@ -1,9 +1,111 @@
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import shutil
 
 from astropy.io import fits
 from dataclasses import dataclass
+
+
+def update_header_response_files(
+    infile: str,
+    respfile: str,
+    ancrfile: str = 'none',
+    outfile: str = None,
+    overwrite: bool = False
+):
+    """
+    Updates RESPFILE and ANCRFILE keywords in the header of 'infile' to the
+    provided respfile and optional ancrfile keywords. If outfile is provided,
+    then infile will be copied to outfile, and the header of outfile will be modified.
+    """
+    
+    respfile = respfile.split('/')[-1]
+    ancrfile = ancrfile.split('/')[-1]
+    if outfile is None:
+        outfile = infile
+    else:
+        shutil.copyfile(infile, outfile)
+    with fits.open(outfile) as hdu:
+        hdu[1].header.set('RESPFILE', respfile)
+        hdu[1].header.set('ANCRFILE', ancrfile)
+        hdu.writeto(outfile, overwrite=overwrite)
+
+
+def make_srm_file(
+    out_file: str,
+    rmf_file: str,
+    arf_file: str = None,
+    data_file: str = None,
+    new_data_file: str = None
+):
+    """
+    Generates a file, with a name provided by out_file, for the
+    SRM using the RMF and optional ARF files. The created SRM file
+    is the same structure as the RMF file.
+
+    The data file corresponds to the provided RMF and ARF files
+    (e.g. a PHA file) and will be updated to point to the newly
+    generated SRM file if provided. If new_data_file is None,
+    then data_file will be overwritten.
+    """
+
+    with fits.open(rmf_file) as hdu:
+        low_threshold = hdu[2].header['LO_THRES']
+
+    handler = ResponseHandler(rmf_file, arf_file)
+    rmf = handler.rmf
+    srm = handler.srm # This is the full, nonsparse matrix
+
+    # Turn into sparse matrix using the same valid positions from the RMF.
+    # This allows us to reuse the other definitions from the RMF file,
+    # e.g. the F_CHAN and N_CHAN columns.
+    rows = []
+    for row in range(len(srm)):
+        goodinds = rmf[row,:].value >= low_threshold
+        srm_row = srm[row,goodinds].value
+        srm_row = np.array(srm_row, dtype=rmf.dtype)
+        rows.append(srm_row)
+    srm = np.array(rows, dtype=object)
+
+    # Create the SRM file.
+    # TODO: Need to determine whether this conforms to OGIP.
+    # I don't think it does since there's no formal definition of an SRM file.
+    shutil.copyfile(rmf_file, out_file)
+    with fits.open(out_file) as hdu:
+        orig_header = hdu[2].header
+        orig_data = hdu[2].data
+        num_fields = int(orig_header['TFIELDS'])
+        for k in orig_header:
+            if orig_header[k] == 'MATRIX':
+                index = int(k[-1])
+                break
+
+        # Copy the columns into the new file.
+        cols = []
+        for col in range(num_fields):
+            if col != (index-1):
+                name = orig_header[f'TTYPE{col+1}']
+                form = orig_header[f'TFORM{col+1}']
+                new_col = fits.Column(name=name, format=form, array=orig_data[name])
+                cols.append(new_col)
+            else:
+                new_col = fits.Column(name='MATRIX', format=orig_header[f'TFORM{index}'], array=srm)
+                cols.append(new_col)
+        
+        hdu[2] = fits.BinTableHDU.from_columns(fits.ColDefs(cols))
+        hdu[2].header = orig_header
+        hdu.writeto(out_file, overwrite=True)
+
+    # Point the data file to the newly created SRM.
+    if data_file is not None:
+        update_header_response_files(
+            data_file,
+            respfile=out_file,
+            ancrfile='none',
+            outfile=new_data_file,
+            overwrite=True
+        )
 
 
 @dataclass
