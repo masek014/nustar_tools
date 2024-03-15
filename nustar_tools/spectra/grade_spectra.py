@@ -76,7 +76,7 @@ class GradeSpectrum():
         return f'FPM {self.fpm}, Grade {self.grade}'
 
     
-    def plot(self, ax: plt.Axes.axes = None) -> plt.Axes.axes:
+    def plot(self, ax: plt.Axes = None) -> plt.Axes:
 
         counts, edges = self.spectrum
         if ax is None:
@@ -144,11 +144,11 @@ class GradeCollection():
 
     def plot_spectra(
         self,
-        ax: plt.Axes.axes = None,
+        ax: plt.Axes = None,
         plot_grades: list[str] = 'all',
         pileup_correction: bool = False,
         pileup_kwargs: dict = {}
-    ) -> plt.Axes.axes:
+    ) -> plt.Axes:
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(6,6), layout='constrained')
@@ -189,9 +189,9 @@ class GradeCollection():
 
     def plot_ratios(
         self,
-        ax: plt.Axes.axes = None,
+        ax: plt.Axes = None,
         reference_grade: str = '0'
-    ) -> plt.Axes.axes:
+    ) -> plt.Axes:
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(6,3), layout='constrained')
