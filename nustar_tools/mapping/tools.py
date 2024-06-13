@@ -94,9 +94,7 @@ def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
         cdelt = map_.scale[0].to(u.arcsec/u.pix)
         areas = ''
         for i in range(len(levels)):
-
             contour = cs.collections[i]
-            
             if contour.get_paths():
                 vs = contour.get_paths()[0].vertices
                 x = vs[:,0]
@@ -436,7 +434,7 @@ def add_overlay(ax):
     lat.set_ticks_visible(False)
     lat.set_ticklabel_visible(False)
     lon.set_ticklabel_visible(False)
-    lon.coord_wrap = 180
+    lon.coord_wrap = 180 * u.deg
     lon.set_major_formatter('dd')
     overlay.grid(color='grey', linewidth=1, linestyle='dotted')
 
