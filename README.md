@@ -13,7 +13,7 @@ Install `nustar_tools` through pip:
 ```
 git clone https://github.com/masek014/nustar_tools.git
 cd nustar_tools
-pip install .
+pip install -e .
 ```
 
 If you want to generate documentation, `pdoc3` is required.
