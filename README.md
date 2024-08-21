@@ -9,17 +9,18 @@
 
 ## Installation
 
-The package is deployed on the Test PyPI, but it will eventually be moved to the real PyPI.
-
 Install `nustar_tools` through pip:
-> pip install -i https://test.pypi.org/simple/ nustar-tools
+```
+git clone https://github.com/masek014/nustar_tools.git
+cd nustar_tools
+pip install .
+```
 
-To build the documentation, `pdoc3` is required and the Git repository must be cloned.
+If you want to generate documentation, `pdoc3` is required.
 Execute the following commands to build the documentation:
 ```
-git clone https://github.umn.edu/MASEK014/nustar_tools.git
 cd nustar_tools/
-pdoc3 --html --output-dir docs
+pdoc3 nustar_tools --html --output-dir docs
 ```
 You will find the documentation in HTML files in the newly created `docs/` directory.
 Begin with `index.html`.

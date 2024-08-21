@@ -13,11 +13,20 @@ from dataclasses import dataclass
 
 import nustar_pysolar as nustar
 
-from array_tools import normalize
 from ..utils import utilities
 from ..plotting import lightcurves
 
 STYLES_DIR = os.path.dirname(os.path.realpath(lightcurves.__file__)) + '/styles/'
+
+
+def normalize(arr):
+    """
+    Normalizes the provided array.
+    """
+    
+    norm = np.linalg.norm(arr)
+
+    return arr / norm
 
 
 def merge_det_arrs(
@@ -45,7 +54,7 @@ def merge_det_arrs(
     return arr
 
 
-def get_region_pixels(map_: sunpy.map.Map, reg: SkyRegion) -> np.ndarray:
+def get_region_pixels(map_: sunpy.map.GenericMap, reg: SkyRegion) -> np.ndarray:
     """
     Returns the coordinates of the pixels within the region in an
     [n, 2] numpy array, where n is the number of rows equal to the
@@ -88,7 +97,7 @@ class PixelArray():
         x_key: str = 'X',
         y_key: str = 'Y',
         keep_cols: list[str] = ['PI'],
-        map_: sunpy.map.Map = None,
+        map_: sunpy.map.GenericMap = None,
         region: SkyRegion = None,
         filters: dict = {}
     ):
@@ -255,7 +264,7 @@ class RawPixelArray(PixelArray):
             evt_data: Table | fits.fitsrec.FITS_rec,
             hdr: fits.header.Header,
             keep_cols: list[str] = ['GRADE', 'PI'],
-            map_: sunpy.map.Map = None,
+            map_: sunpy.map.GenericMap = None,
             region: SkyRegion = None,
             filters: dict = {}
         ):

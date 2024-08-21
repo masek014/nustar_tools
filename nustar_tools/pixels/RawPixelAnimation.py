@@ -1,8 +1,9 @@
-import photutils
-import numpy as np
+import astropy.units as u
 import matplotlib
 import matplotlib.pyplot as plt
-import astropy.units as u
+import numpy as np
+import photutils
+
 from matplotlib import animation
 
 import nustar_pysolar as nustar

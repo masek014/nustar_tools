@@ -1,11 +1,26 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import numpy as np
 
-from array_tools import find_continuities
 from ..utils import utilities
 from ..plotting import tools as ptools
 from ..mapping import tools as mtools
+
+
+def find_continuities(a):
+
+    ind = np.where(a != 0)[0]
+    continuities = [] # list of tuples defining the continuous ranges, inclusive
+    start = end = ind[0]
+    for i in ind[1:]:
+        if i != end+1 or i == ind[-1]:
+            if i == ind[-1]:
+                end = i
+            continuities.append((start, end))
+            start = i
+        end = i
+
+    return continuities
 
 
 class TrackerCorrelator():

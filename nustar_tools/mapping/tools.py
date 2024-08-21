@@ -2,19 +2,20 @@ import gc
 import math
 
 import astropy
-import photutils
-import sunpy.map
-import matplotlib
-import numpy as np
 import astropy.units as u
-import scipy.optimize as opt
+import photutils
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mplcolors
-from pylab import cm, text
+import numpy as np
+import scipy.optimize as opt
+import sunpy.map
+
+from pylab import text
 from scipy import ndimage
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
-from regions import PixCoord, CirclePixelRegion, CircleSkyRegion, RectanglePixelRegion, RectangleSkyRegion
+from regions import PixCoord, CirclePixelRegion, RectangleSkyRegion
 
 from ..utils import utilities
 
@@ -163,7 +164,7 @@ def apply_contour(submap, cmap, dmin, dmax):
     cm2 = mplcolors.LinearSegmentedColormap.from_list('simple', [(1,1,1),(1,1,1)], N=2)
 
     # Setup up the map norm and colors and contour colours.
-    submap.plot_settings['cmap'] = cm.get_cmap(cmap)
+    submap.plot_settings['cmap'] = plt.get_cmap(cmap)
     submap.plot_settings['norm'] = mplcolors.LogNorm(vmin=dmin,vmax=dmax)
     submap2.plot_settings['cmap'] = cm2
 
@@ -213,7 +214,7 @@ def apply_colorbar(fig, ax, width=0.005, **kwargs):
 
 
 def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
-    cmap=plt.cm.get_cmap('jet'), width=0.05, format='%li', label=''):
+    cmap=plt.get_cmap('jet'), width=0.05, format='%li', label=''):
     """
     Adds a colorbar to the map plot.
     A new axes object is created to house the colorbar.
@@ -410,8 +411,8 @@ def set_ticks(ax, b_hide_axes=False):
     lat.set_minor_frequency(4)
 
     # Coordinate grid
-    lon.grid(color='grey', alpha=0.1, linestyle='solid')
-    lat.grid(color='grey', alpha=0.1, linestyle='solid')
+    lon.grid(color='grey', alpha=0.5, linestyle='solid')
+    lat.grid(color='grey', alpha=0.5, linestyle='solid')
 
     if b_hide_axes:
         lon.set_axislabel('')
@@ -434,7 +435,7 @@ def add_overlay(ax):
     lat.set_ticks_visible(False)
     lat.set_ticklabel_visible(False)
     lon.set_ticklabel_visible(False)
-    lon.coord_wrap = 180 * u.deg
+    lon.coord_wrap = 180 #* u.deg
     lon.set_major_formatter('dd')
     overlay.grid(color='grey', linewidth=1, linestyle='dotted')
 

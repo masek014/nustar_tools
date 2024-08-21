@@ -232,7 +232,7 @@ class RegionSelector():
     def save_fig(self, fig_type):
 
         utilities.create_directory(self.out_dir)
-        plt.savefig(f'{self.out_dir}{self.region_label}_{fig_type}_{self._param_str}.png', bbox_inches='tight')
+        plt.savefig(f'{self.out_dir}{self.region_label}_{fig_type}_{self._param_str}.png')
 
 
     def set_energy_range(self, energy_range):
@@ -456,9 +456,9 @@ class RegionSelector():
             hspace=0.0,
         )
         
+        plt.style.use(f'{LIGHTCURVE_STYLES_DIR}/lightcurve.mplstyle')
         _, ax_map, _ = self.plot_overview_map(fig=fig, index=gs[0,0])
         
-        plt.style.use(f'{LIGHTCURVE_STYLES_DIR}/lightcurve.mplstyle')
         ax_lc = fig.add_subplot(gs[1,0])
 
         if self.hk_file is None:

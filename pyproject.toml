@@ -1,0 +1,24 @@
+[project]
+dynamic = ["version", "authors", "license"]
+requires-python = ">=3.10"
+name = "nustar_tools"
+dependencies = [
+    "astropy",
+    "imageio",
+    "matplotlib",
+    "numpy",
+    "nustar_pysolar",
+    "photutils",
+    "regions",
+    "scipy",
+    "scikit-image",
+    "sunpy"
+]
+readme = "README.md"
+
+[build-system]
+requires = ["setuptools >= 61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "nustar_tools.__version__"}

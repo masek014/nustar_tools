@@ -128,7 +128,7 @@ class GradeCollection():
         count = 0
         for fpm in self.fpms:
             self.data[fpm] = {}
-            cmap = matplotlib.cm.get_cmap(kwargs[fpm].pop('cmap'))
+            cmap = matplotlib.colormaps[kwargs[fpm].pop('cmap')]
             for grade in self.grades:
                 grade_path = self.grade_path_format.format(fpm=fpm, grade=grade)
                 color = cmap(count/total_spectra)
