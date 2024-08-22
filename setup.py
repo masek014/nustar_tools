@@ -40,6 +40,6 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://github.umn.edu/MASEK014/nustar_tools',
     license='MIT',
-    python_requires='>=3.7',
+    python_requires='>=3.10',
     install_requires=install_requires
 )
