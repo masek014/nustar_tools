@@ -1,5 +1,6 @@
 build/
 dist/
+docs/
 nustar_tools.egg-info/
 __pycache__/
 test_files/
