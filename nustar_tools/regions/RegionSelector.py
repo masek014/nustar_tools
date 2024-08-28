@@ -231,7 +231,7 @@ class RegionSelector():
 
     def save_fig(self, fig_type):
 
-        utilities.create_directory(self.out_dir)
+        utilities.create_directories(self.out_dir)
         plt.savefig(f'{self.out_dir}{self.region_label}_{fig_type}_{self._param_str}.png')
 
 

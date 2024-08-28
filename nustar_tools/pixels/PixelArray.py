@@ -212,11 +212,11 @@ class PixelArray():
         time_range: tuple[float, float] = None,
         energy_range: tuple[float, float] = None,
         hk_file: str = None,
-        ax: matplotlib.axes.Axes = None,
+        ax: plt.Axes = None,
         b_show_error: bool = True,
         b_normalize: bool = False,
         **kwargs
-    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+    ) -> tuple[plt.Figure, plt.Axes]:
 
         default_kwargs = dict(
             color='black',
@@ -299,7 +299,12 @@ class RawPixelArray(PixelArray):
         return np.array(det_arrs)
     
     
-    def plot_det_counts(self, time_range=None, axs=None, cmaps=['Blues', 'Greens', 'Oranges', 'Reds']):
+    def plot_det_counts(
+        self,
+        time_range: tuple[float, float] = None,
+        axs: list[np.ndarray, np.ndarray, np.ndarray, np.ndarray] = None,
+        cmaps=['Blues', 'Greens', 'Oranges', 'Reds']
+    ) -> tuple[np.ndarray[plt.Axes], np.ndarray[np.ndarray]]:
 
         if time_range is None:
             time_range = self.time_range

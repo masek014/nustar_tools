@@ -41,7 +41,7 @@ def move_and_untar(tar_file):
     shutil.move(src, dest)
             
     date_dir = NU_DATA_DIR + date + '/'
-    utilities.create_directory(date_dir)
+    utilities.create_directories(date_dir)
 
     pre_list = os.listdir(date_dir)
     os.system(f'tar -zxvf {dest} -C {date_dir}')
@@ -92,7 +92,7 @@ def auto_pipeline():
     """
     
     # Check that the essential directories exist. Create them if they do not.
-    utilities.create_directory(ESSENTIAL_DIRS)
+    utilities.create_directories(ESSENTIAL_DIRS)
 
     print(f'Checking {TAR_DIR} for new data sets.')
     files = os.listdir(TAR_DIR)

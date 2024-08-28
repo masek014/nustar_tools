@@ -476,7 +476,7 @@ def get_home():
     return str(Path.home())
 
 
-def create_directory(dirs):
+def create_directories(dirs: str | list[str]):
     """
     Checks if the provided directory exists.
     Creates the directory if it does not exist.
@@ -496,7 +496,7 @@ def create_directory(dirs):
         os.makedirs(d, exist_ok=True)
 
 
-def verify_path(in_path, b_is_dir=True, b_make_absdir=True):
+def verify_path(in_path, is_dir: bool = True, make_abs_dir: bool = True) -> str:
     """
     Verifies whether the provided path or directory is valid or not.
     Adds a '/' to the end of the string if one is not already there.
@@ -507,9 +507,9 @@ def verify_path(in_path, b_is_dir=True, b_make_absdir=True):
     ----------
     in_path : str
         Input path to be checked.
-    b_is_dir : bool
+    is_dir : bool
         Specifies whether in_path is a directory.
-    b_make_absdir : bool
+    make_abs_dir : bool
         Specifies whether or not the make in_path
         an absolute directory.
 
@@ -520,20 +520,20 @@ def verify_path(in_path, b_is_dir=True, b_make_absdir=True):
         If the directory is not good, an exception is raised.
     """
 
-    if b_is_dir:
+    if is_dir:
         in_path = clean_directory_string(in_path) # Clean up the string
 
     # Check if the directory exists
     if not os.path.exists(in_path):
         raise FileNotFoundError(f'\'{in_path}\' is not a valid path.')
-    elif b_make_absdir:
+    elif make_abs_dir:
         # Check if dir is an absolute directory. It is isn't, make it absolute.
         in_path = os.path.abspath(in_path) + '/'
     
     return in_path
 
 
-def get_file_name(in_file, b_include_ext=False):
+def get_file_name(in_file: str, include_extension: bool = False) -> str:
     """
     Returns the file name of the input string.
     Can specify whether the file extension is desired or not.
@@ -545,7 +545,7 @@ def get_file_name(in_file, b_include_ext=False):
     ----------
     in_file : str
         The path containing the file name.
-    b_include_ext : bool
+    include_extension : bool
         Specifies whether to include the file extension in the return.
     
     Returns
@@ -555,7 +555,7 @@ def get_file_name(in_file, b_include_ext=False):
     """
 
     file_name = ''
-    if b_include_ext:
+    if include_extension:
         file_name = in_file[find_nth(in_file, '/', in_file.count('/'))+1:]
     else:
         file_name = in_file[find_nth(in_file, '/', in_file.count('/'))+1:in_file.find('.')]

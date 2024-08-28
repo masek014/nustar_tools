@@ -5,20 +5,21 @@ import matplotlib.animation as animation
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
+import nustar_pysolar as nustar
 import os
 import photutils
 import ruptures as rpt
 
 from astropy.io import fits
-from astropy.table import QTable
+from astropy.table import QTable, Column
 from astropy.time import Time
+from matplotlib.collections import PathCollection
 from scipy.fft import fft, fftfreq
 
-import nustar_pysolar as nustar
 
-from ..utils import utilities
 from ..pixels import PixelArray as pa
 from ..plotting import tools as ptools
+from ..utils import utilities
 
 
 EVT_FILE_PATH_FORMAT = '{id_dir}/event_cl/nu{id_num:11}{fpm}06_cl.evt'
@@ -159,7 +160,10 @@ def make_sunpy_array(evtdata, hdr, exp_time=0, on_time=0, shevt_xy=[0,0]):
 
 
 # TODO: Move this to utilities.py (or someplace).
-def get_observation_time(id_dir: str, fpm: str) -> tuple:
+def get_observation_time(
+    id_dir: str,
+    fpm: str
+) -> tuple[datetime.datetime, datetime.datetime]:
     """
     Reads the first and last time from the photon list corresponding
     to the provided observation ID and FPM.
@@ -219,27 +223,27 @@ class CoordinateTracker():
 
 
     @property
-    def timestep(self):
-        return (self.times[1] - self.times[0]).total_seconds()
+    def timestep(self) -> u.Quantity:
+        return (self.times[1] - self.times[0]).total_seconds() * u.s
 
 
     @property
-    def times(self):
+    def times(self) -> Column[u.Quantity]:
         return self._coords['TIME']
 
     
     @property
-    def x(self):
+    def x(self) -> u.Quantity:
         return self._coords[self.x_key]
 
 
     @property
-    def y(self):
+    def y(self) ->  u.Quantity:
         return self._coords[self.y_key]
 
 
     @property
-    def x_key(self):
+    def x_key(self) -> str | None:
 
         for key in self.data_keys:
             if 'X' in key.upper():
@@ -247,7 +251,7 @@ class CoordinateTracker():
 
 
     @property
-    def y_key(self):
+    def y_key(self) -> str | None:
 
         for key in self.data_keys:
             if 'Y' in key.upper():
@@ -255,7 +259,10 @@ class CoordinateTracker():
 
 
     @property
-    def unit(self):
+    def unit(self) -> str:
+        """
+        The unit defined in the FITS header.
+        """
 
         for k in self.hdr.keys():
             if self.hdr[k] == self.data_keys[-1]:
@@ -264,13 +271,16 @@ class CoordinateTracker():
 
 
     @property
-    def date(self):
+    def date(self) -> str:
+        """
+        YYYYMMDD
+        """
         p = utilities.parse.parse(utilities.ID_DIR_PATH_FORMAT, self.id_dir)
         return p['date']
 
 
     @property
-    def observation_time(self):
+    def observation_time(self) -> tuple[datetime.datetime, datetime.datetime]:
         return get_observation_time(self.id_dir, self.fpm)
 
 
@@ -285,7 +295,10 @@ class CoordinateTracker():
 
 
     # TODO: Move this utilities?
-    def get_field_unit(self, field):
+    def get_field_unit(self, field: str) -> str:
+        """
+        Returns the unit corresponding to the provided FITS header key.
+        """
 
         for k in self.hdr.keys():
             if 'TTYPE' in k and self.hdr[k] == field:
@@ -313,7 +326,7 @@ class CoordinateTracker():
             print('Coordinates not yet calculated. Not saving to file.')
 
 
-    def time_filter(self, time_range):
+    def time_filter(self, time_range: tuple[datetime.datetime, datetime.datetime]):
 
         obs_inds = (self.times >= time_range[0]) & (self.times <= time_range[1])
         self._coords = self._coords[obs_inds]
@@ -351,6 +364,10 @@ class CoordinateTracker():
 
 
     def initialize(self):
+        """
+        Loads the coordinates from a pickle, if present.
+        If pickle is not present, then this reads the data, then saves the coordinates.
+        """
 
         self.load_coordinates()
         if self._coords is None:
@@ -359,6 +376,9 @@ class CoordinateTracker():
 
 
     def convert_to_solar(self):
+        """
+        Converts the X and Y coordinates to solar coordinates.
+        """
 
         evt_file = EVT_FILE_PATH_FORMAT.format(
             id_dir=self.id_dir, id_num=self.id_num, fpm=self.fpm
@@ -371,8 +391,12 @@ class CoordinateTracker():
         self._coords[self.y_key] = y
 
 
-    def coordinate_scatter(self, ax: plt.axis, b_add_hist: bool = True,
-            **set_kwargs: dict):
+    def coordinate_scatter(
+        self,
+        ax: plt.Axes,
+        b_add_hist: bool = True,
+        **set_kwargs: dict
+    ) -> PathCollection:
 
         cmap = 'rainbow'
         norm = colors.Normalize()
@@ -409,12 +433,16 @@ class CoordinateTracker():
 
     def coordinate_timeseries(
         self,
-        ax: matplotlib.axes.Axes,
+        ax: plt.Axes,
         which_coord: str,
         b_cpd: bool = False,
         plot_kwargs: dict = {},
         set_kwargs: dict = {}
-    ):
+    ) -> list[plt.Line2D]:
+        """
+        plot_kwargs specifies e.g. line color, width, etc.
+        set_kwargs is for the ax.set() call, e.g. xlim, ylim, etc.
+        """
         
         default_plot_kwargs = {
             'color': 'black',
@@ -456,10 +484,10 @@ class CoordinateTracker():
         return line
 
     
-    def coordinate_fft(self, ax):
+    def coordinate_fft(self, ax: plt.Axes):
 
         N = self.x.size
-        tf = fftfreq(N, self.timestep)[:N//2]
+        tf = fftfreq(N, (self.timestep<<u.s).value)[:N//2]
         
         # Remove nans.
         x = self.x.astype(float)
@@ -483,8 +511,11 @@ class CoordinateTracker():
         ax.legend()
 
 
-    def make_overview(self, suptitle: str = 'Coordinate Tracker Overview',
-        b_add_fft: bool = True):
+    def make_overview(
+        self,
+        suptitle: str = 'Coordinate Tracker Overview',
+        b_add_fft: bool = True
+    ) -> plt.Figure:
 
         ptools.apply_style()
 
@@ -529,34 +560,34 @@ class CoordinateTracker():
 class AttitudeTracker(CoordinateTracker):
 
 
-    def __init__(self, id_dir):
+    def __init__(self, id_dir: str):
         keys = ['TIME', 'POINTING']
         super().__init__(id_dir, None, ATT_FILE_PATH_FORMAT, keys)
 
     
     @property
-    def x(self):
+    def x(self) -> u.Quantity:
         return self._coords['POINTING'][:,0]
 
     
     @property
-    def y(self):
+    def y(self) -> u.Quantity:
         return self._coords['POINTING'][:,1]
     
 
     # This quantity is the pointing angle of the spacecraft.
     @property
-    def z(self):
+    def z(self) -> u.Quantity:
         return self._coords['POINTING'][:,2]
 
     
     @property
-    def observation_time(self):
+    def observation_time(self) -> tuple[datetime.datetime, datetime.datetime]:
         return get_observation_time(self.id_dir, 'A')
 
 
     @property
-    def nominal_coordinate(self):
+    def nominal_coordinate(self) -> tuple[float, float]:
         
         # coords = ['RA_NOM', 'DEC_NOM']
         # units = []
@@ -574,6 +605,9 @@ class AttitudeTracker(CoordinateTracker):
 
     # TODO: Figure out why it's saving self._coords in deg instead of arcsec.
     def convert_to_solar(self):
+        """
+        Convert pointing coordinates to solar coordinate frame.
+        """
 
         x, y = radec_to_solar(self.times, self.x, self.y)
         self._coords['POINTING'][:,0] = x
@@ -582,12 +616,14 @@ class AttitudeTracker(CoordinateTracker):
 
     def coordinate_timeseries(
         self,
-        ax: matplotlib.axes.Axes,
+        ax: plt.Axes,
         which_coord: str,
         plot_kwargs: dict = {},
         set_kwargs: dict = {}
-    ):
+    ) -> list[plt.Line2D]:
         """
+        plot_kwargs specifies e.g. line color, width, etc.
+        set_kwargs is for the ax.set() call, e.g. xlim, ylim, etc.
         which_coord specifies the X, Y, and Z coordinate, which denote
         the RA, Dec, and Angle of the attitude.
         """
@@ -606,7 +642,7 @@ class AttitudeTracker(CoordinateTracker):
         }
 
         set_kwargs = {**default_set_kwargs, **set_kwargs}
-        super().coordinate_timeseries(
+        return super().coordinate_timeseries(
             ax,
             which_coord,
             plot_kwargs=plot_kwargs,
@@ -618,7 +654,7 @@ class AttitudeTracker(CoordinateTracker):
         self,
         suptitle: str = 'Attitude Tracker Overview',
         b_add_fft: bool = True
-    ) -> matplotlib.figure.Figure:
+    ) -> plt.Figure:
 
         ptools.apply_style()
 
@@ -665,7 +701,7 @@ class AttitudeTracker(CoordinateTracker):
 class MastTracker(CoordinateTracker):
 
 
-    def __init__(self, id_dir):
+    def __init__(self, id_dir: str):
         keys = ['TIME', 'T_FBOB']
         super().__init__(id_dir, None, MAST_FILE_PATH_FORMAT, keys)
 
@@ -727,6 +763,9 @@ class CentroidTracker(CoordinateTracker):
         which_pixels: str,
         out_dir: str = 'centroid_coordinates'
     ):
+        """
+        which_pixels is either RAW, SKY, or SOL
+        """
 
         self.which_pixels = which_pixels.upper()
         if self.which_pixels == 'RAW' or self.which_pixels == 'SOL':
@@ -750,7 +789,7 @@ class CentroidTracker(CoordinateTracker):
 
 
     def read_data(self, time_range: tuple = None):
-
+    
         evt_data, hdr = utilities.get_event_data(self.data_file)
         start, end, num_frames = utilities.characterize_frames(evt_data, self.frame_length)
         start_dt = utilities.convert_nustar_time_to_datetime(start)
@@ -794,7 +833,7 @@ class CentroidTracker(CoordinateTracker):
         self._coords = QTable([times, x, y], names=self.data_keys, units=units)
 
     
-    def plot_centroid(self, time_limits=None, b_cpd=False):
+    def plot_centroid(self, time_limits: tuple[str, str] = None, b_cpd: bool = False):
 
         ptools.apply_style()
 
@@ -837,7 +876,7 @@ class CentroidTracker(CoordinateTracker):
 class TrackerAnimation():
 
 
-    def __init__(self, tracker):
+    def __init__(self, tracker: CoordinateTracker):
         
         self.tracker = tracker
         self.num_frames = len(self.tracker.times)
@@ -854,7 +893,7 @@ class TrackerAnimation():
         self.sc.set_clim(0, self.num_frames)
         # plt.colorbar(self.sc, ax=self.ax, cmap=cmap, pad=0.01, aspect=100, label='Time step')
         
-        self.cmap = plt.cm.get_cmap('rainbow')
+        self.cmap = plt.get_cmap('rainbow')
         self.cmap_values = self.cmap(np.arange(0, len(self.tracker.times), 1))
         sm = plt.cm.ScalarMappable(cmap=self.cmap)
         sm.set_clim(0, len(self.tracker.times))
@@ -872,7 +911,7 @@ class TrackerAnimation():
     #     return self.sc,
 
 
-    def update_plot(self, frame):
+    def update_plot(self, frame) -> tuple[PathCollection]:
 
         print(frame)
         self.xdata.append(self.tracker.x[frame])

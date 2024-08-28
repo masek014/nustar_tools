@@ -1,11 +1,22 @@
+import astropy.units as u
+import copy
+import math
+import matplotlib.colors as mplcolors
+import matplotlib.pyplot as plt
+import numpy as np
+import nustar_pysolar as nustar
+import photutils
+import sunpy.map
+
+from astropy.time import Time
+from regions import CircleSkyRegion, PixCoord, RectanglePixelRegion, SkyRegion
+
 from . import tools as mtools
+from ..utils import utilities
 from ..utils.MinimumBoundingBox import MinimumBoundingBox
 
 import warnings
 warnings.simplefilter('ignore')
-
-utilities = mtools.utilities
-nustar = utilities.nustar
 
 
 def make_nustar_map(evt_data, hdr, time_range=None, b_norm=False):
@@ -28,7 +39,7 @@ def make_nustar_map(evt_data, hdr, time_range=None, b_norm=False):
 
     filtered_data = evt_data
     if time_range is not None:
-        time_range = mtools.Time(list(time_range), format='iso', scale='utc')
+        time_range = Time(list(time_range), format='iso', scale='utc')
         filtered_data = evt_data[nustar.filter.by_time(evt_data, hdr, time_range)]
 
     # NOTE: Each data array associated with a full-sized map takes up about 71 MB of memory.
@@ -126,7 +137,7 @@ def make_sunpy_with_array(evt_data, hdr, data_array, exp_time=0, on_time=0, rebi
     """    
 
     sunpy_header = mtools.make_sunpy_header(evt_data, hdr, exp_time, on_time, rebin_size, b_norm)    
-    data_map = mtools.sunpy.map.Map(data_array, sunpy_header)
+    data_map = sunpy.map.Map(data_array, sunpy_header)
 
     return data_map
 
@@ -150,7 +161,7 @@ def make_det_array(evt_data):
         The null value (no photon event) is -1.
     """
 
-    arr = mtools.np.full((2999,2999), -1)
+    arr = np.full((2999,2999), -1)
 
     x, y = evt_data['X'], evt_data['Y']
     dets = evt_data['DET_ID']
@@ -255,10 +266,10 @@ def plot_det_map(evt_data, hdr, fig=None, ax=None, title=None, corners=None):
     det_map.data[:] -= 1
 
     if fig is None:
-        fig = mtools.plt.figure(figsize=(8,8))
+        fig = plt.figure(figsize=(8,8))
         ax = fig.add_subplot(111, projection=det_submap)
 
-    cmap = mtools.plt.cm.get_cmap('jet')
+    cmap = plt.get_cmap('jet')
     det_submap.plot(cmap=cmap)
     limb = det_submap.draw_limb(color='white', linewidth=1.25,
         linestyle='dotted', zorder=0, label='Solar disk')
@@ -303,7 +314,7 @@ def make_cluster_map_data(cluster, detection_val=1.0, connection_val=0.01):
 
     rebin_size = cluster.pixel_list[0].bin_size
     coordinate_pairs = cluster.get_coordinate_pairs()
-    data_array = mtools.np.zeros(shape=(mtools.math.ceil(2999/rebin_size),mtools.math.ceil(2999/rebin_size)))
+    data_array = np.zeros(shape=(math.ceil(2999/rebin_size),math.ceil(2999/rebin_size)))
     b_first = True
     
     for pair in coordinate_pairs:
@@ -361,11 +372,11 @@ def make_cluster_map(evt_file, fig_dir, clusters_list, axes_limits=[],
             obs_map_dir = utilities.os.path.normpath(fig_dir + utilities.os.sep + utilities.os.pardir)+'/'
             nustar_submap, fig, ax, axes_limits = plot_observation_map(evt_file, fig_dir=obs_map_dir)
 
-        total_data_array = mtools.np.zeros(shape=(mtools.math.ceil(2999/macropixel_bin_size),mtools.math.ceil(2999/macropixel_bin_size)))
+        total_data_array = np.zeros(shape=(math.ceil(2999/macropixel_bin_size),math.ceil(2999/macropixel_bin_size)))
 
         for cluster in clusters_list:
             cluster_array = make_cluster_map_data(cluster)
-            total_data_array = mtools.np.add(total_data_array, cluster_array)
+            total_data_array = np.add(total_data_array, cluster_array)
 
         # Read configuration settings.
         config_dict = {}
@@ -440,7 +451,7 @@ def make_event_map(event, axes_limits=[], b_add_spec_region=True, b_add_fov=True
         axes_limits = list(corners)
 
     event_submap, fig, ax, _ = mtools.apply_map_settings(event.event_map, corners=axes_limits,
-        cmap='viridis', norm=mtools.mplcolors.Normalize(0, mtools.np.max(data_array)),
+        cmap='viridis', norm=mplcolors.Normalize(0, np.max(data_array)),
         label='Counts')
     ax.set_title(f'NuSTAR Eventmap {event.event_id} {event.start}')
 
@@ -526,8 +537,8 @@ class FOV():
         # Get the bounding box around the data.
         data_coords = mtools.get_data_coords(data_map.data)
         bbox = MinimumBoundingBox(data_coords)
-        c1, c2, c3, c4 = mtools.np.array([list(x) for x in list(bbox.corner_points)])
-        rot_angle = mtools.np.degrees(bbox.unit_vector_angle)
+        c1, c2, c3, c4 = np.array([list(x) for x in list(bbox.corner_points)])
+        rot_angle = np.degrees(bbox.unit_vector_angle)
 
         # Find two opposite corners to get the center point.
         corners = [c1, c2, c3, c4]
@@ -545,11 +556,11 @@ class FOV():
         center_x_pix = (opposite_pair[0][0] + opposite_pair[1][0]) / 2
         center_y_pix = (opposite_pair[0][1] + opposite_pair[1][1]) / 2
 
-        rect = mtools.RectanglePixelRegion(
-            center=mtools.PixCoord(center_x_pix, center_y_pix),
+        rect = RectanglePixelRegion(
+            center=PixCoord(center_x_pix, center_y_pix),
             width=bbox.length_parallel,
             height=bbox.length_orthogonal,
-            angle=rot_angle*mtools.u.deg)
+            angle=rot_angle*u.deg)
 
         # Store the attribute as a RectangleSkyRegion.
         self.rect = rect.to_sky(data_map.wcs)
@@ -565,9 +576,10 @@ class FOV():
 
         # Ensure the array does not contain only zeros.
         if reg_data.any():
-            com = mtools.photutils.centroids.centroid_com(reg_data)
-            com_sky = mtools.PixCoord(com[0], com[1]).to_sky(self.data_map.wcs)
-            new_region = mtools.CircleSkyRegion(com_sky, radius=region.radius)
+            y, x = np.unravel_index(reg_data.argmax(), reg_data.shape) # brightest pixel
+            # x, y = photutils.centroids.centroid_com(reg_data) # center of mass
+            com_sky = PixCoord(x, y).to_sky(self.data_map.wcs)
+            new_region = CircleSkyRegion(com_sky, radius=region.radius)
         else:
             print('Submap contains only zeros. Not fitting region center.')
             new_region = region
@@ -616,7 +628,7 @@ class FOV():
         # Compute difference between the shapes in each direction.
         diff = [abs(v1 - v2) for v1, v2 in zip((fov_mask.data).shape, (intersection_mask.data).shape)]
 
-        return mtools.np.max(diff)
+        return np.max(diff)
 
 
     def fit_region_within_edges(self, region):
@@ -639,9 +651,9 @@ class FOV():
         # Determine how many pixels the region extends beyond the FOV edges.
         extended_pix = self.check_region_outside_fov(region)
         if extended_pix > 0:
-            extended_pix += 10 # Reduce it by another ~4 arcseconds to account for pixel uncertainty
-            dec_value = extended_pix*((self.data_map).scale[0].value) * mtools.u.arcsec
-            region.radius = max(region.radius - dec_value, 10*mtools.u.arcsecond) # TODO: How do we want to handle this?
+            extended_pix += 5 # Reduce it by another ~2 arcseconds to account for pixel uncertainty
+            dec_value = extended_pix*((self.data_map).scale[0].value) * u.arcsec
+            region.radius = max(region.radius - dec_value, 10*u.arcsecond) # TODO: How do we want to handle this?
         
         return region
 
@@ -668,7 +680,7 @@ class FOV():
 
         while len(dets) > 1 and region.radius.value > 25: # TODO: Make this min radius selection better
             # Decrement by 2.5 arcseconds per iteration since each detector pixel is about 2.5 arcseconds
-            region.radius = (region.radius.value - 2.5)*mtools.u.arcsec
+            region.radius = (region.radius.value - 2.5)*u.arcsec
             dets = mtools.find_dets_in_region(det_map, region.to_pixel(det_map.wcs))
             if -1 in dets:
                 dets.remove(-1)
@@ -676,7 +688,13 @@ class FOV():
         return region
 
 
-    def fit_region(self, region):
+    def fit_region(
+        self,
+        region: SkyRegion,
+        fit_coordinate_center: bool = True,
+        fit_within_detector_edges: bool = True,
+        fit_within_chipgap: bool = True
+    ) -> SkyRegion:
         """
         Fit the inital region within the chip gap by reducing the radius
         if the region contains events from more than one detector.
@@ -694,9 +712,13 @@ class FOV():
             (center_x, center_y, radius) in arcseconds.
         """
 
-        reg = self.fit_coordinate_center(region)
-        reg = self.fit_region_within_edges(reg)
-        reg = self.fit_region_within_chipgap(reg)
+        reg = copy.deepcopy(region)
+        if fit_coordinate_center:
+            reg = self.fit_coordinate_center(reg)
+        if fit_within_detector_edges:
+            reg = self.fit_region_within_edges(reg)
+        if fit_within_chipgap:
+            reg = self.fit_region_within_chipgap(reg)
 
         return reg
 
@@ -750,9 +772,9 @@ class FOV():
                 mtools.plot_point(c[0], c[1], ax, radius=1/m_size)
 
         if b_draw_chip_gap:
-            cg_rect1 = mtools.RectanglePixelRegion(mtools.PixCoord(*fov_pix.center.xy),
+            cg_rect1 = RectanglePixelRegion(PixCoord(*fov_pix.center.xy),
                 10/m_size, fov_pix.height, angle=fov_pix.angle)
             cg_rect1.plot(ax=ax, facecolor='none', edgecolor=kwargs['edgecolor'], linestyle='dashed', lw=1)
-            cg_rect2 = mtools.RectanglePixelRegion(mtools.PixCoord(*fov_pix.center.xy),
+            cg_rect2 = RectanglePixelRegion(PixCoord(*fov_pix.center.xy),
                 fov_pix.width, 10/m_size, angle=fov_pix.angle)
             cg_rect2.plot(ax=ax, facecolor='none', edgecolor=kwargs['edgecolor'], linestyle='dashed', lw=1)

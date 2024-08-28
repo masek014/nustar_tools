@@ -41,7 +41,7 @@ def save_plot(fig, fig_dir, fig_name, type='png'):
     """
 
     fig_dir = utilities.verify_path(fig_dir)
-    utilities.create_directory(fig_dir)
+    utilities.create_directories(fig_dir)
     ext = '.' + type
     if ext not in fig_name:
         fig_name = fig_name + ext

@@ -8,6 +8,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mplcolors
 import numpy as np
+import os
+import pickle
 import scipy.optimize as opt
 import sunpy.map
 
@@ -86,31 +88,34 @@ def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
             region.radius.value
         )
         region_submap = map_.submap(bottom_left=bl, top_right=tr)
-       
+        levels = levels << u.percent
+        fig, ax = plt.subplots(figsize=(8,8), layout='constrained', subplot_kw=dict(projection=region_submap))
         cs = region_submap.draw_contours(
-            levels*u.percent,
+            levels,
             axes=ax,
+            cmap='Grays'
         )
+        region_submap.plot(axes=ax)
+        plt.savefig(os.path.join(out_dir, 'contour_map.png'), dpi=100)
         
         cdelt = map_.scale[0].to(u.arcsec/u.pix)
-        areas = ''
+        areas = {}
         for i in range(len(levels)):
             contour = cs.collections[i]
             if contour.get_paths():
                 vs = contour.get_paths()[0].vertices
                 x = vs[:,0]
                 y = vs[:,1]
-                area = 0.5*np.sum(y[:-1]*np.diff(x) - x[:-1]*np.diff(y)) * (u.pix)**2
-                area = np.abs(area)*cdelt*cdelt
-                # print(f'{levels[i]}%: {area.value:.02f}')
-                areas += (f'{area.value:0.2f},')
+                area = 0.5*np.sum(y[:-1]*np.diff(x) - x[:-1]*np.diff(y)) << u.pix**2
+                area = np.abs(area) * cdelt * cdelt
+                areas[levels[i]] = area
             else:
-                areas += 'nan,'
+                areas[levels[i]] = np.nan
 
-        areas = areas[:-1]
-        # with open(f'{out_dir}contours.txt', 'w') as outfile:
-            # outfile.write(areas)
-        
+        pickle_path = os.path.join(out_dir, 'contours.pkl')
+        with open(pickle_path, 'wb') as outfile:
+            pickle.dump(areas, outfile)
+
         return areas
 
 

@@ -70,7 +70,7 @@ def plot_exposure_maps(evt_data, hdr, spec_region=None,
     # Plot the count data.
     ax1 = fig.add_subplot(1, int(b_plot_detmap)+1, 1, projection=nustar_submap)
     map_axes = [ax1]
-    cmap1 = mtools.plt.cm.get_cmap('Spectral_r')
+    cmap1 = mtools.plt.get_cmap('Spectral_r')
     nustar_submap.plot(norm=mtools.mplcolors.Normalize(), cmap=cmap1)
     limb = nustar_submap.draw_limb(color='white', linewidth=1.25, linestyle='dotted', zorder=0, label='Solar disk')
     ax1.set(xlabel='x [arcsec]', ylabel='y [arcsec]')
@@ -150,7 +150,7 @@ def make_exposure_movie(evt_file, start, number_frames, time_step, exposure_time
     """
 
     print('Making exposure movie starting at ' + start)
-    utilities.create_directory(fig_dir)
+    utilities.create_directories(fig_dir)
 
     evt_data, hdr = utilities.get_event_data(evt_file)
     if corners is None:

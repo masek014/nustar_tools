@@ -171,17 +171,29 @@ class TrackerCorrelator():
         ax.set_ylim(ylim)
 
     
-    def plot_tracker(self, which, xax, yax, where=None, **set_kwargs):
+    def plot_tracker(
+        self,
+        which: str,
+        xax: plt.Axes,
+        yax: plt.Axes,
+        where: np.ndarray = None,
+        **set_kwargs
+    ):
+        """
+        'which' can either be  '1' or '2'
+        'where' is a boolean array specifying intervals to shade
+        """
 
-        if which == '1':
+        if str(which) == '1':
             tracker = self.tracker1
-        elif which == '2':
+        elif str(which) == '2':
             tracker = self.tracker2
 
         for ax, coord in zip([xax, yax], ['x', 'y']):
-            tracker.coordinate_timeseries(ax, coord,
-                xlabel='', ylabel=f'T{which} {coord.upper()}',
-                **set_kwargs
+            tracker.coordinate_timeseries(
+                ax,
+                coord,
+                set_kwargs=set_kwargs
             )
             if where is not None:
                 self.fill_time(ax, where)
