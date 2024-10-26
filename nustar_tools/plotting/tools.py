@@ -17,13 +17,13 @@ def apply_style():
     plt.style.use(f'{STYLES_DIR}lightcurve.mplstyle')
 
 
-def apply_colorbar(fig, ax, width=0.005, **kwargs):
+def apply_colorbar(fig, ax, **kwargs):
     """
     Use the apply_colorbar method from mapping.tools.
     """
     
     from ..mapping.tools import apply_colorbar
-    apply_colorbar(fig, ax, width, **kwargs)
+    apply_colorbar(fig, ax, **kwargs)
 
 
 def save_plot(fig, fig_dir, fig_name, type='png'):
@@ -366,7 +366,7 @@ def add_event_lines(axes, start_time, end_time, b_vertical=True, b_shaded=False,
     x_dat = get_stair_datetimes(axes.patches[0]) # Get stair time edges
 
     # Add the vertical lines.
-    if b_vertical or (start_time == end_time):
+    """if b_vertical or (start_time == end_time):
 
         if b_shaded:
             start_index = np.argmax(x_dat>=start_time)
@@ -378,7 +378,7 @@ def add_event_lines(axes, start_time, end_time, b_vertical=True, b_shaded=False,
             end_edge = end_time - utilities.timedelta(seconds=(x_dat[2]-x_dat[1]).total_seconds())
 
         axes.axvline(x=start_edge, **kwargs)
-        axes.axvline(x=end_edge, **kwargs)
+        axes.axvline(x=end_edge, **kwargs)"""
     
     # Shade the region between the lines.
     if b_shaded:
@@ -386,10 +386,10 @@ def add_event_lines(axes, start_time, end_time, b_vertical=True, b_shaded=False,
         end_bools = x_dat <= end_time
         bool_arr = [start_bools[i] and end_bools[i] for i in range(0, np.size(start_bools))]
         axes.fill_between(x_dat, 0, 1, where=bool_arr,
-                color=kwargs['color'], alpha=0.2, transform=axes.get_xaxis_transform())
+                color=kwargs['color'], alpha=0.3, transform=axes.get_xaxis_transform())
 
 
-def add_events(ax, events_dict, color='lightsteelblue', frame_labelsize=10):
+def add_events(ax, events_dict, color='lightsteelblue', frame_labelsize=matplotlib.rcParams['font.size']/2):
     """
     Shades the event time intervals for all events contained in events_dict.
     The start frames of each event are marked on the top x-axis (or set 
@@ -475,7 +475,7 @@ def add_skewnorm(time_edges, ax, amp, a, loc, scale, background=None):
     ploty = fit.pdf(x) * amp
     
     if background is None: #Case of using count rates
-        ax.plot(plotx, ploty, color='red', ls='-', lw=5, label='Fit Curve')
+        ax.plot(plotx, ploty, color='red', ls='-', lw=1.5, label='Fit Curve')
     else: #Case of using residual rates
         plot_bkgd = np.zeros(shape=np.shape(x))
         for index in range(len(plotx)): #Iterate through all of the plotting indices
@@ -486,7 +486,7 @@ def add_skewnorm(time_edges, ax, amp, a, loc, scale, background=None):
                     break
         
         #Plot residual fit + background rates
-        ax.plot(plotx, ploty + plot_bkgd, color='orange', ls='-', lw=5, label='Fit Curve + Background')
+        ax.plot(plotx, ploty + plot_bkgd, color='orange', ls='-', lw=1.5, label='Fit Curve + Background')
 
     return ax
 

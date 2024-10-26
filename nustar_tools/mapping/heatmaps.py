@@ -1,6 +1,9 @@
+import matplotlib
+import numpy as np
+
+from ..utils import utilities
 from . import tools as mtools
-np = mtools.np
-utilities = mtools.utilities
+
 
 
 def make_square(row_coords, col_coords):
@@ -109,7 +112,7 @@ def plot_heatmap(arr, x_tick_labels=[], y_tick_labels=[],
     ax.tick_params(axis='both', which='major', pad=15)
 
     im = ax.imshow(arr, **cb_kwargs)
-    mtools.apply_colorbar(fig, ax, 0.01, **cb_kwargs)
+    mtools.apply_colorbar(fig, ax, **cb_kwargs)
     ax.set(xlabel=xlabel, ylabel=ylabel, title=title)
     set_heatmap_ticks(ax, x_tick_labels, y_tick_labels)
 
@@ -121,7 +124,7 @@ def plot_heatmap(arr, x_tick_labels=[], y_tick_labels=[],
                     c = 'black'
                 else:
                     c = 'white'
-                text = ax.text(j, i, count_val, fontsize=12,
+                text = ax.text(j, i, count_val, fontsize=matplotlib.rcParams['font.size'],
                     ha='center', va='center', color=c)
 
     mtools.save_map(fig, fig_dir, file_name)

@@ -51,7 +51,7 @@ def combine_plots(id_dir, fpm, frame_length, energy_range,
     xlim = ptools.get_frame_limits(evt_data, frame_length)
 
     # Create the the combined plots for both FPMs.
-    fig = lightcurves.plt.figure(figsize=(CMBN_CONFIG['PLOT_WIDTH'], CMBN_CONFIG['PLOT_HEIGHT']))
+    fig = lightcurves.plt.figure(figsize=(4,6))
 
     _, lightcurve_axis = lightcurves.make_observation_lightcurve(evt_file, hk_file,
         frame_length=frame_length, energy_range=energy_range,

@@ -1,5 +1,9 @@
 import datetime
+import matplotlib.pyplot as plt
 import numpy as np
+import os
+
+from astropy.io import fits
 
 from ..utils import utilities
 from ..plotting import tools as ptools
@@ -45,7 +49,7 @@ def array_livetime_correction(hk_file, counts, time_edges):
 
 
 def plot_spectrogram(evt_data, time_range=None, energy_range=(3,10),
-    num_bins=20, cmap = ptools.plt.cm.jet, hk_file=None, b_livetime_correction=False,
+    num_bins=20, cmap = plt.cm.jet, hk_file=None, b_livetime_correction=False,
     title_append='', fig_dir='./', file_name='spectrogram'):
     """
     Make and plot a spectrogram of the provided data.
@@ -114,7 +118,7 @@ def plot_spectrogram(evt_data, time_range=None, energy_range=(3,10),
         if hk_file is not None:
             H = array_livetime_correction(hk_file, H, xedges)
             title_str += ' Livetime Corrected'
-            cbar_str = 'Count rates (c/s)'
+            cbar_str = 'Count rates [ct/s]'
         else:
             print('[plot_spectrogram] HK file needed when \
                 performing livetime correction.')
@@ -124,17 +128,16 @@ def plot_spectrogram(evt_data, time_range=None, energy_range=(3,10),
     xedges_datetime = to_datetime(xedges, tz=datetime.timezone.utc)
     
     # Make the plot.
-    fig, ax = ptools.plt.subplots(figsize=(12,6))
+    fig, ax = plt.subplots()
     norm_max = max(2, np.nanmax(H))
     norm = ptools.matplotlib.colors.LogNorm(1, norm_max)
     spectrogram = ax.pcolor(xedges_datetime, yedges, H.T,
         cmap=cmap, norm=norm
     )
 
-    ax.set(xlabel='Time', ylabel='Energy (keV)', title=title_str)
+    ax.set(ylabel='Energy [keV]', title=title_str)
     ptools.set_x_ticks(ax, x_min, x_max)
-    ptools.apply_colorbar(fig, ax, width=0.01,
-        cmap=cmap, norm=norm, label=cbar_str)
+    ptools.apply_colorbar(fig, ax, cmap=cmap, norm=norm, label=cbar_str)
 
     ptools.save_plot(fig, fig_dir, file_name)
 
@@ -176,7 +179,7 @@ def plot_photon_spectrum(evt_data, energy_range=None, bin_width=0.2,
 
     num_bins = int((energy_range[1]-energy_range[0])/bin_width)
     
-    fig, ax = ptools.plt.subplots(figsize=(12,12))
+    fig, ax = plt.subplots()
     counts, edges = np.histogram(energies, bins=num_bins, range=energy_range)
     ax.stairs(counts, edges, color='purple', label=f'{energy_range} keV')
 
@@ -224,7 +227,7 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
 
     colors = ['red', 'orange', 'blue', 'purple', 'brown', 'green', 'yellow']
     pha_files, labels = [], []
-    sorted_dir = utilities.os.listdir(in_dir)
+    sorted_dir = os.listdir(in_dir)
     sorted_dir.sort()
     
     # Put grade 0 first (sorting doesn't work due to how Python sorts).
@@ -237,13 +240,11 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
                 pha_files.append(in_dir + f)
                 labels.append('Grade ' + f.split('_g')[1].split('_sr')[0])
 
-    ptools.plt.rcParams['font.size'] = 16
-
     title_str = ''
-    fig, ax = ptools.plt.subplots(figsize=(8,8))
+    fig, ax = plt.subplots()
     for f, c, l in zip(pha_files, colors, labels):
         
-        with utilities.fits.open(f) as hdu:
+        with fits.open(f) as hdu:
             hdr, evt = hdu[1].header, hdu[1].data
         bins, counts = evt['CHANNEL'], evt['COUNTS']
         bins = utilities.convert_pi_to_energy(bins)
@@ -268,16 +269,16 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
             g_unphysical_file = f
 
     if b_has_grade0 and b_has_unphysical:
-        with utilities.fits.open(g0_file) as hdu:
+        with fits.open(g0_file) as hdu:
             evt = hdu[1].data
         g0_counts = evt['COUNTS']
-        with utilities.fits.open(g_unphysical_file) as hdu:
+        with fits.open(g_unphysical_file) as hdu:
             evt = hdu[1].data
         g_unphysical_counts = evt['COUNTS']
 
         ax.step(bins, g0_counts-0.25*g_unphysical_counts, color='cyan', label='G0 - 0.25*G21-24')
 
-    ax.legend(fontsize=18)
+    ax.legend()
 
     ptools.save_plot(fig, fig_dir, file_name)
 

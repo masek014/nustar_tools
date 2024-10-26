@@ -89,14 +89,14 @@ def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
         )
         region_submap = map_.submap(bottom_left=bl, top_right=tr)
         levels = levels << u.percent
-        fig, ax = plt.subplots(figsize=(8,8), layout='constrained', subplot_kw=dict(projection=region_submap))
+        fig, ax = plt.subplots(subplot_kw=dict(projection=region_submap))
         cs = region_submap.draw_contours(
             levels,
             axes=ax,
             cmap='Grays'
         )
         region_submap.plot(axes=ax)
-        plt.savefig(os.path.join(out_dir, 'contour_map.png'), dpi=100)
+        plt.savefig(os.path.join(out_dir, 'contour_map.png'))
         
         cdelt = map_.scale[0].to(u.arcsec/u.pix)
         areas = {}
@@ -183,7 +183,7 @@ def apply_contour(submap, cmap, dmin, dmax):
     comp_map.plot()
 
 
-def apply_colorbar(fig, ax, width=0.005, **kwargs):
+def apply_colorbar(fig, ax, width=0.05, **kwargs):
     """
     Adds a colorbar to the map plot.
     A new axes object is created to house the colorbar.
@@ -488,7 +488,6 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
     """
 
     default_kwargs = {
-        'width': 0.02,
         'cmap': 'plasma',
         'norm': mplcolors.LogNorm(np.min(nustar_map.data[nustar_map.data!=0]), np.max(nustar_map.data)),
         'label': nustar_map.meta['pixlunit']
@@ -510,7 +509,7 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
     
     # Create the figure with the applied settings
     if fig is None:
-        fig = plt.figure(figsize=(12,12), constrained_layout=True)
+        fig = plt.figure()
     ax = fig.add_subplot(index, projection=nustar_submap)
 
     if b_blur:

@@ -1,3 +1,5 @@
+import matplotlib
+import matplotlib.colors as mplcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import warnings
@@ -9,9 +11,6 @@ from .movies import make_movies
 from ..utils import utilities
 
 warnings.simplefilter('ignore') # Suppress astropy warning about changing dates
-
-
-INFO_FONT_SIZE = 10
 
 
 def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
@@ -64,25 +63,33 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
     mtools.apply_style()
     text_color = 'black'
 
-    nustar_map = maps.make_nustar_map(evt_data, hdr)
+    nustar_map = maps.make_nustar_map(evt_data, hdr, normalize=True)
     nustar_submap = mtools.get_submap(nustar_map, corners)
     fig = plt.figure()
 
     # Adjust the size if plotting both maps.
     if b_plot_detmap:
         fig_size = fig.get_size_inches()
-        fig_size[0] = fig_size[0]*2.4
+        fig_size[0] = fig_size[0] *     2
         fig = plt.figure(figsize=fig_size)
 
     # Plot the count data.
     ax1 = fig.add_subplot(1, int(b_plot_detmap)+1, 1, projection=nustar_submap)
     map_axes = [ax1]
     cmap1 = plt.get_cmap('Spectral_r')
-    nustar_submap.plot(norm=mtools.mplcolors.Normalize(), cmap=cmap1)
-    limb = nustar_submap.draw_limb(color='white', linewidth=1.25, linestyle='dotted', zorder=0, label='Solar disk')
+    nustar_submap.plot(cmap=cmap1)
+    norm1 = nustar_submap.plot_settings['norm']
+    
+    limb = nustar_submap.draw_limb(color='white', linestyle='dotted', zorder=0, label='Solar disk')
     ax1.set(xlabel='x [arcsec]', ylabel='y [arcsec]')
-    cbax1, cb1 = mtools.apply_colorbar(fig, ax1,
-        norm=mtools.mplcolors.Normalize(), cmap=cmap1, label='Normalized Counts')
+    ax1.grid(False)
+
+    cbax1, cb1 = mtools.apply_colorbar(
+        fig, ax1,
+        norm=norm1, cmap=cmap1,
+        width=0.05,
+        label='[DN/s]'
+    )
 
     if b_fit_gaussian:
         mtools.fit_gaussian(nustar_submap, ax1)
@@ -91,6 +98,7 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
         ax2 = fig.add_subplot(122, projection=nustar_submap)
         fig, ax2, det_submap = maps.plot_det_map(evt_data, hdr, fig, ax2, corners=corners)
         ax2.set(xlabel='x [arcsec]', ylabel='y [arcsec]', title='Detector Visualization')
+        ax2.grid(False)
         map_axes.append(ax2)
         text_color = 'white'
 
@@ -114,7 +122,7 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
         r = spec_region.radius.value
         pix_region = spec_region.to_pixel(nustar_submap.wcs)
         for a in map_axes:
-            pix_region.plot(ax=a, lw=3, edgecolor='white',
+            pix_region.plot(ax=a, edgecolor='white',
                 linestyle='dotted', facecolor='white',
                 fill=True, alpha=0.25, label='Spec. Region')
 
@@ -228,33 +236,42 @@ def plot_fpm_maps(evt_file, time_interval=None,
 
         if fig is None:
             nustar_submap = mtools.get_submap(nustar_map, [-1500, -1500, 1500, 1500])
-
             fig = plt.figure()
             ax = fig.add_subplot(111, projection=nustar_submap)
             nustar_submap.data[:,:] = mtools.np.nan
-            nustar_submap.plot(norm=mtools.mplcolors.LogNorm(vmin=1,vmax=1))
-            limb = nustar_submap.draw_limb(color='black', linewidth=1.25,
+            nustar_submap.plot(norm=mplcolors.LogNorm(vmin=1,vmax=1))
+            limb = nustar_submap.draw_limb(color='black',
                 linestyle='dotted', zorder=0, label='Solar disk')
 
         fov = maps.FOV(evt_data, hdr)
         fov.plot(nustar_submap, ax,
             b_draw_chip_gap=False, b_plot_center=False, b_plot_corners=False,
             fill=True, alpha=0.5, facecolor=colors[i], edgecolor=colors[i],
-            linestyle='solid', lw=1, label=f'FPM {fpm}')
+            linestyle='solid', label=f'FPM {fpm}')
         text_str = f'FPM {fpm}\n{fov.get_fov_string()}'
 
         text_color = 'black'
         x_pos = 0.02 + i*0.5
-        mtools.text(x_pos, 0.91, text_str, fontsize=INFO_FONT_SIZE+2,
-            color=text_color, va='center', transform=ax.transAxes)
+        mtools.text(
+            x_pos, 0.89,
+            text_str,
+            fontsize=matplotlib.rcParams['font.size']/2,
+            color=text_color,
+            va='center',
+            transform=ax.transAxes
+        )
 
     if time_interval is None:
         end_time = utilities.convert_nustar_time_to_string(evt_data['TIME'][-1]).split(' ')[-1]
     else:
         end_time = time_interval[1].split(' ')[-1]
 
-    ax.set(xlabel='x [arcsecond]', ylabel='y [arcsecond]',
-        title=f'{ax.get_title()} - {end_time}')
+    ax.grid(False)
+    ax.set(
+        xlabel='x [arcsecond]',
+        ylabel='y [arcsecond]',
+        title=f'{ax.get_title()} - {end_time}'
+    )
 
     # ax.legend(loc=3, handles=artists) # TODO: Fix the labels. They arent showing up
     mtools.save_map(fig, fig_dir, file_name)

@@ -403,7 +403,7 @@ def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
         c_thresh = mp_array.connection_threshold
         param_str = r'$\sigma _d =$ ' + str(d_thresh) + r' $\sigma_c =$ ' + str(c_thresh) + ', '
         file_name += '_events'
-        xax2 = ptools.add_events(ax, mp_array.events_dict, frame_labelsize=LTCV_CONFIG['EVENT_LABELSIZE'])
+        xax2 = ptools.add_events(ax, mp_array.events_dict)
 
     in_fpm = utilities.get_fpm_from_filename(evt_file)
     time_range = (utilities.convert_nustar_time_to_string(time_edges[0]),

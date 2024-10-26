@@ -8,6 +8,7 @@ import nustar_pysolar as nustar
 import photutils
 import sunpy.map
 
+from astropy.io import fits
 from astropy.time import Time
 from regions import CircleSkyRegion, PixCoord, RectanglePixelRegion, SkyRegion
 
@@ -19,9 +20,14 @@ import warnings
 warnings.simplefilter('ignore')
 
 
-def make_nustar_map(evt_data, hdr, time_range=None, b_norm=False):
+def make_nustar_map(
+    evt_data: fits.FITS_rec,
+    hdr: fits.Header,
+    time_range: tuple[Time, Time] | None = None,
+    normalize: bool = False
+) -> sunpy.map.GenericMap:
     """
-    Makes a map for the provided evt file.
+    Makes a map for the provided data.
 
     Parameters
     ----------
@@ -32,8 +38,8 @@ def make_nustar_map(evt_data, hdr, time_range=None, b_norm=False):
     time_range : tuple
         The time range (start, end) to filter the data around.
         In the format YYYY-MM-DD HH:MM:SS in UTC.
-    b_norm: bool
-        Specifies whether to normalise the map data by the
+    normalize: bool
+        Specifies whether to normalize the map data by the
         exposure time (i.e. livetime), giving map in units of DN/s.
     """
 
@@ -43,13 +49,18 @@ def make_nustar_map(evt_data, hdr, time_range=None, b_norm=False):
         filtered_data = evt_data[nustar.filter.by_time(evt_data, hdr, time_range)]
 
     # NOTE: Each data array associated with a full-sized map takes up about 71 MB of memory.
-    nustar_map = nustar.map.make_sunpy(filtered_data, hdr, norm_map=b_norm)
+    nustar_map = nustar.map.make_sunpy(filtered_data, hdr, norm_map=normalize)
 
     return nustar_map
 
 
-def plot_observation_map(evt_file, b_norm=False, fig_dir='./',
-    file_name='observation_map', **cb_kwargs):
+def plot_observation_map(
+    evt_file: str,
+    normalize: bool = False,
+    fig_dir: str = './',
+    file_name: str = 'observation_map',
+    **cb_kwargs
+) -> tuple[sunpy.map.GenericMap, plt.Figure, plt.Axes, list]:
     """
     Makes a map for the provided evt file and plots
     it on a figure.
@@ -59,7 +70,7 @@ def plot_observation_map(evt_file, b_norm=False, fig_dir='./',
     evt_file : str
         The path to the photon event file containing
         the data to be plotted.
-    b_norm: bool
+    normalize: bool
         Specifies whether to normalise the map data by the
         exposure time (i.e. livetime), giving map in units of DN/s.
     fig_dir : str
@@ -82,7 +93,7 @@ def plot_observation_map(evt_file, b_norm=False, fig_dir='./',
     """
 
     evt_data, hdr = utilities.get_event_data(evt_file)
-    nustar_map = make_nustar_map(evt_data, hdr, b_norm=b_norm)
+    nustar_map = make_nustar_map(evt_data, hdr, normalize=normalize)
     nustar_submap, fig, ax, axes_limits = mtools.apply_map_settings(nustar_map, **cb_kwargs)
     
     mtools.save_map(fig, fig_dir, file_name)
@@ -90,7 +101,15 @@ def plot_observation_map(evt_file, b_norm=False, fig_dir='./',
     return nustar_submap, fig, ax, axes_limits
 
 
-def make_sunpy_with_array(evt_data, hdr, data_array, exp_time=0, on_time=0, rebin_size=1.0, b_norm=False):
+def make_sunpy_with_array(
+    evt_data: fits.FITS_rec,
+    hdr: fits.Header,
+    data_array: np.ndarray,
+    exp_time: float = 0,
+    on_time: float = 0,
+    rebin_size: float = 1.0,
+    normalized: bool = False
+):
     """
     This method is very similar to nustar_pysolar's 'make_sunpy'
     method with the primary difference being that this method creates
@@ -124,10 +143,10 @@ def make_sunpy_with_array(evt_data, hdr, data_array, exp_time=0, on_time=0, rebi
         On time.
     rebin_size : float
         Size used for rebinning the data read from the event file.
-    b_norm : bool
+    normalized : bool
         Boolean specifying whether or not the map should be normalized.
         Note: this method does **not** perform a normalization.
-        b_norm should specify whether the parent map of data_array
+        normalize should specify whether the parent map of data_array
         was normalized.
 
     Returns
@@ -136,13 +155,13 @@ def make_sunpy_with_array(evt_data, hdr, data_array, exp_time=0, on_time=0, rebi
         The map object that was created using data_array.
     """    
 
-    sunpy_header = mtools.make_sunpy_header(evt_data, hdr, exp_time, on_time, rebin_size, b_norm)    
+    sunpy_header = mtools.make_sunpy_header(evt_data, hdr, exp_time, on_time, rebin_size, normalized)    
     data_map = sunpy.map.Map(data_array, sunpy_header)
 
     return data_map
 
 
-def make_det_array(evt_data):
+def make_det_array(evt_data: fits.FITS_rec) -> np.ndarray:
     """
     Makes an array tracking the most recent det
     that apppears in each pixel.
@@ -170,7 +189,7 @@ def make_det_array(evt_data):
     return arr
 
 
-def make_det_array3d(evt_data):
+def make_det_array3d(evt_data: fits.FITS_rec) -> dict:
     """
     Makes a dictionary tracking the dets that appear
     in each pixel. Tracks a list for each coordinate
@@ -203,7 +222,10 @@ def make_det_array3d(evt_data):
     return d
 
 
-def make_det_map(evt_data, hdr):
+def make_det_map(
+    evt_data: fits.FITS_rec,
+    hdr: fits.Header
+) -> sunpy.map.GenericMap:
     """
     Makes a map consisting of the det information for each pixel.
     Note that if photons from different detectors hit the same pixel,
@@ -229,7 +251,13 @@ def make_det_map(evt_data, hdr):
     return det_map
 
 
-def plot_det_map(evt_data, hdr, fig=None, ax=None, title=None, corners=None):
+def plot_det_map(
+    evt_data: fits.FITS_rec,
+    hdr: fits.Header,
+    fig: plt.Figure = None,
+    ax: plt.Axes = None,
+    corners: list = None
+) -> tuple[plt.Figure, plt.Axes, sunpy.map.GenericMap]:
     """
     Makes and plots a det map.
 
@@ -243,8 +271,6 @@ def plot_det_map(evt_data, hdr, fig=None, ax=None, title=None, corners=None):
         A figure on which the map will be plotted.
     ax : matplotlib axes
         Axes on which the map will be plotted.
-    title : str
-        The title of the plot.
     corners : list
         List of corners bounding the plotting area.
         [xmin, ymin, xmax, ymax]
@@ -259,13 +285,13 @@ def plot_det_map(evt_data, hdr, fig=None, ax=None, title=None, corners=None):
         The map of the plotted data. 
     """
     
-    mtools.apply_style()
     det_map = make_det_map(evt_data, hdr)
     det_map.data[:] += 1
     det_submap = mtools.get_submap(det_map, corners=corners)
     det_map.data[:] -= 1
 
     if fig is None:
+        mtools.apply_style()
         fig = plt.figure(figsize=(8,8))
         ax = fig.add_subplot(111, projection=det_submap)
 
@@ -275,10 +301,8 @@ def plot_det_map(evt_data, hdr, fig=None, ax=None, title=None, corners=None):
         linestyle='dotted', zorder=0, label='Solar disk')
     
     ax.set(xlabel='x [arcsec]', ylabel='y [arcsec]')
-    if title is not None:
-        ax.set(title=title)
 
-    mtools.apply_discrete_colorbar(fig, ax, 5, -1, 3)
+    mtools.apply_discrete_colorbar(fig, ax, 5, -1, 3, cmap=cmap, width=0.05)
 
     return fig, ax, det_submap
 
@@ -460,9 +484,9 @@ def make_event_map(event, axes_limits=[], b_add_spec_region=True, b_add_fov=True
         init_pix_reg = event.initial_spec_region.to_pixel(event_submap.wcs)
         center_x, center_y, radius = event.get_arcsecond_coordinates()
         coord_str = f'c: ({center_x:.2f}\", {center_y:.2f}\") r: {radius:.2f}\"'
-        pix_reg.plot(ax=ax, edgecolor='red', linestyle='dashed', lw=2,
+        pix_reg.plot(ax=ax, edgecolor='red', linestyle='dashed',
             label=f'spec coords:, {coord_str}')
-        init_pix_reg.plot(ax=ax, edgecolor='blue', linestyle='dashed', lw=2)
+        init_pix_reg.plot(ax=ax, edgecolor='blue', linestyle='dashed')
         # ax.legend(prop={'size': 12})
 
     if b_add_fov:
@@ -473,6 +497,7 @@ def make_event_map(event, axes_limits=[], b_add_spec_region=True, b_add_fov=True
         # text(0.02, 0.90, spec_str + '\n' + fov_str, fontsize=12,
         #   color='black', va='center', transform=ax.transAxes)
 
+    ax.grid(False)
     mtools.save_map(fig, event.event_dir, 'eventmap')
 
     return fig, ax, event_submap
@@ -501,15 +526,15 @@ class FOV():
     fitting a region within the FOV and plotting the FOV.
     """
 
-    def __init__(self, evt_data, hdr):
+    def __init__(self, evt_data: fits.FITS_rec, hdr: fits.Header):
         """
         Initialize the object with the data and the time of interest.
         The FOV is then fit accordingly.
 
         Parameters
         ----------
-        evt_file : str
-            A path to the input .evt file.
+        evt_data : FITS rec array
+            Data to be plotted.
         time_interval : tuple or list
             # Specify the start and end time of an interval of interest.
             The resulting FOV is fit only around data within the specified
@@ -566,9 +591,9 @@ class FOV():
         self.rect = rect.to_sky(data_map.wcs)
 
 
-    def fit_coordinate_center(self, region):
+    def fit_coordinate_center(self, region: SkyRegion) -> SkyRegion:
         """
-        Region is a SkyRegion object.
+        Moves the center of the provided region to the brightest pixel.
         """
 
         reg_data = mtools.get_region_data(region.to_pixel(self.data_map.wcs),
@@ -587,7 +612,7 @@ class FOV():
         return new_region
 
 
-    def check_region_outside_fov(self, region):
+    def check_region_outside_fov(self, region: SkyRegion):
         """
         Check whether the given region is within the other region.
 
@@ -678,7 +703,7 @@ class FOV():
         det_map = make_det_map(self.evt_data, self.hdr)
         dets = mtools.find_dets_in_region(det_map, region.to_pixel(det_map.wcs))
 
-        while len(dets) > 1 and region.radius.value > 25: # TODO: Make this min radius selection better
+        while len(dets) > 2 and region.radius.value > 25: # TODO: Make this min radius selection better
             # Decrement by 2.5 arcseconds per iteration since each detector pixel is about 2.5 arcseconds
             region.radius = (region.radius.value - 2.5)*u.arcsec
             dets = mtools.find_dets_in_region(det_map, region.to_pixel(det_map.wcs))
@@ -735,7 +760,7 @@ class FOV():
         return s
 
 
-    def plot(self, input_map, ax, b_draw_chip_gap=True, b_plot_corners=True, b_plot_center=True, **kwargs):
+    def plot(self, input_map, ax, b_draw_chip_gap=True, b_plot_corners=False, b_plot_center=False, **kwargs):
         """
         Plot the FOV on the provided map.
 

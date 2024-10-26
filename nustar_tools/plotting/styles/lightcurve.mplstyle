@@ -1,32 +1,40 @@
-font.size           : 20
-legend.fontsize     : 16
+font.size           : 8
+legend.fontsize     : 6
 
-figure.figsize      : 12, 6
-figure.dpi          : 240
-savefig.dpi         : 240
+figure.constrained_layout.use: True
+figure.figsize      : 4,2
+savefig.dpi         : 300
 
-axes.titlesize      : 20
-axes.titlepad       : 8
+axes.titlesize      : 8
+axes.linewidth: 0.8
+axes.grid: False
 
-lines.linewidth     : 2
-lines.markersize    : 6
+grid.color: "#000000"
+
+lines.linewidth : 1
+
+scatter.marker     : +
 
 xtick.top           : True
 xtick.minor.visible : True
-xtick.major.size    : 10
-xtick.minor.size    : 5
-xtick.major.width   : 1
-xtick.minor.width   : 1
+xtick.major.size    : 5
+xtick.minor.size    : 2.5
+xtick.major.width   : 0.8
+xtick.minor.width   : 0.8
 xtick.major.pad     : 10
 xtick.minor.pad     : 10
 xtick.direction     : in
+xtick.color         : black
+xtick.labelcolor    : black
 
 ytick.right         : True
 ytick.minor.visible : True
-ytick.major.size    : 10
-ytick.minor.size    : 5
-ytick.major.width   : 1
-ytick.minor.width   : 1
+ytick.major.size    : 5
+ytick.minor.size    : 2.5
+ytick.major.width   : 0.8
+ytick.minor.width   : 0.8
 ytick.major.pad     : 10
 ytick.minor.pad     : 10
 ytick.direction     : in
+ytick.color         : black
+ytick.labelcolor    : black
