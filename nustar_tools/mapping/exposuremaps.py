@@ -1,23 +1,30 @@
-from . import maps
-from .movies import make_movies
-
-mtools = maps.mtools
-utilities = mtools.utilities
-
+import matplotlib.pyplot as plt
+import numpy as np
 import warnings
+
+from astropy.coordinates import SkyCoord
+
+from . import maps, tools as mtools
+from .movies import make_movies
+from ..utils import utilities
+
 warnings.simplefilter('ignore') # Suppress astropy warning about changing dates
 
 
 INFO_FONT_SIZE = 10
 
 
-def plot_exposure_maps(evt_data, hdr, spec_region=None,
+def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
     b_plot_fov=True, b_plot_detmap=True, b_fit_gaussian=False,
     b_add_contours=False, corners=None,
     fig_dir='', file_name='exposure_map'):
     """
     Make an exposure map for the provided event list.
     An exposure map shows the normalized pixel counts.
+
+    We provide it the region kwargs so that it is able
+    to plot the region off-disk in the case of the region
+    and map having different observers.
 
     Parameters
     ----------
@@ -59,18 +66,18 @@ def plot_exposure_maps(evt_data, hdr, spec_region=None,
 
     nustar_map = maps.make_nustar_map(evt_data, hdr)
     nustar_submap = mtools.get_submap(nustar_map, corners)
-    fig = mtools.plt.figure()
+    fig = plt.figure()
 
     # Adjust the size if plotting both maps.
     if b_plot_detmap:
         fig_size = fig.get_size_inches()
         fig_size[0] = fig_size[0]*2.4
-        fig = mtools.plt.figure(figsize=fig_size, constrained_layout=True)
+        fig = plt.figure(figsize=fig_size)
 
     # Plot the count data.
     ax1 = fig.add_subplot(1, int(b_plot_detmap)+1, 1, projection=nustar_submap)
     map_axes = [ax1]
-    cmap1 = mtools.plt.get_cmap('Spectral_r')
+    cmap1 = plt.get_cmap('Spectral_r')
     nustar_submap.plot(norm=mtools.mplcolors.Normalize(), cmap=cmap1)
     limb = nustar_submap.draw_limb(color='white', linewidth=1.25, linestyle='dotted', zorder=0, label='Solar disk')
     ax1.set(xlabel='x [arcsec]', ylabel='y [arcsec]')
@@ -96,7 +103,13 @@ def plot_exposure_maps(evt_data, hdr, spec_region=None,
         fov.plot(fov_map, map_axes[-1], edgecolor='pink')
         text_str += fov.get_fov_string()
 
-    if spec_region is not None:
+    if region_kwargs is not None:
+
+        region_class = region_kwargs.pop('region_class')
+        center = region_kwargs.pop('center')
+        center = SkyCoord(*center, frame=nustar_submap.coordinate_frame)
+        spec_region = region_class(center=center, **region_kwargs)
+
         x, y = spec_region.center.Tx.arcsec, spec_region.center.Ty.arcsec
         r = spec_region.radius.value
         pix_region = spec_region.to_pixel(nustar_submap.wcs)
@@ -107,7 +120,7 @@ def plot_exposure_maps(evt_data, hdr, spec_region=None,
 
         if b_add_contours:
             smoothed_submap = mtools.apply_gaussian_blur(nustar_submap, 2)
-            mtools.draw_nustar_contours(smoothed_submap, a, range(10,100,10), spec_region, out_dir=fig_dir)
+            mtools.draw_nustar_contours(smoothed_submap, a, np.arange(80,100,0.1), spec_region, out_dir=fig_dir)
         
         if b_plot_detmap:
             dets_in_reg = mtools.find_dets_in_region(det_submap, pix_region)
@@ -119,13 +132,13 @@ def plot_exposure_maps(evt_data, hdr, spec_region=None,
             'spec. radius: {r:0.2f}\"\n'
 
         # Check if the spec reg overlaps with FOV region.
-        if b_plot_fov:
-            pixel_diff = fov.check_region_outside_fov(spec_region)
-            text_str += 'outside FOV: '
-            if pixel_diff:
-                text_str += 'yes ({pixel_diff} pixels)\n'
-            else:
-                text_str += 'no\n'
+        # if b_plot_fov:
+        #     pixel_diff = fov.check_region_outside_fov(spec_region)
+        #     text_str += 'outside FOV: '
+        #     if pixel_diff:
+        #         text_str += 'yes ({pixel_diff} pixels)\n'
+        #     else:
+        #         text_str += 'no\n'
 
     # mtools.text(0.02, 0.88, text_str, fontsize=INFO_FONT_SIZE,
     #     color=text_color, va='center', transform=map_axes[-1].transAxes)
@@ -216,7 +229,7 @@ def plot_fpm_maps(evt_file, time_interval=None,
         if fig is None:
             nustar_submap = mtools.get_submap(nustar_map, [-1500, -1500, 1500, 1500])
 
-            fig = mtools.plt.figure()
+            fig = plt.figure()
             ax = fig.add_subplot(111, projection=nustar_submap)
             nustar_submap.data[:,:] = mtools.np.nan
             nustar_submap.plot(norm=mtools.mplcolors.LogNorm(vmin=1,vmax=1))

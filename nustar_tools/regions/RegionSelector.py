@@ -441,8 +441,6 @@ class RegionSelector():
                 **kwargs
             )
 
-        ax.legend()
-
         self.set_energy_range(orig_energy_range)
 
         return fig, ax
@@ -491,11 +489,13 @@ class RegionSelector():
         self,
         frame_length,
         energy_ranges: tuple[tuple] = None,
-        fig: matplotlib.figure.Figure = None,
-        ax: matplotlib.axes.Axes = None,
-        submap: sunpy.map.Map = None,
+        fig: plt.Figure = None,
+        ax: plt.Axes = None,
+        submap: sunpy.map.GenericMap = None,
         inset_pos: tuple[float] | list[float] = [0.4, 0.4, 0.2, 0.2],
-        region_kw: dict = {}
+        map_kw: dict = {},
+        region_kw: dict = {},
+        lc_kwargs: dict = {}
     ):
 
         b_quantity = isinstance(inset_pos[0], u.Quantity)
@@ -504,8 +504,9 @@ class RegionSelector():
             inset_pos = self._convert_position_to_fraction(inset_pos)
 
         if fig is None:
+            plt.style.use(f'{LIGHTCURVE_STYLES_DIR}/inset_lightcurve.mplstyle')
             inset_pos = self._fit_inset_pos(inset_pos)
-            fig, ax, submap = self.plot_overview_map(region_kw=region_kw)
+            fig, ax, submap = self.plot_overview_map(region_kw=region_kw, map_kw=map_kw)
 
         # TODO: See if we can clean this part up a bit.
         if b_quantity:
@@ -519,7 +520,6 @@ class RegionSelector():
         else:
             transform = None
             
-        plt.style.use(f'{LIGHTCURVE_STYLES_DIR}/inset_lightcurve.mplstyle')
         axins = ax.inset_axes(
             inset_pos,
             transform=transform,
@@ -530,12 +530,13 @@ class RegionSelector():
             lc_unit = 'ct'
         else:
             lc_unit = 'ct/s'
-        lc_kwargs = dict(
+        default_lc_kwargs = dict(
             frame_length=frame_length,
             fig=fig,
             ax=axins,
             title=f'Region lightcurve ({lc_unit})'
         )
+        lc_kwargs = {**default_lc_kwargs, **lc_kwargs}
         if energy_ranges is None:
             lightcurve_method = self.plot_lightcurve
         else:
@@ -548,22 +549,29 @@ class RegionSelector():
         pad_mult = 1.05
         indic_col = (0.5, 0.5, 0.5, 0.75)
 
-        # TODO: Make agnostic to region type.
         bottom_left = SkyCoord(
-            *( (self.region.center.Tx.value,self.region.center.Ty.value)*u.arcsec - self.region.radius*pad_mult ) << u.arcsec,
+            *( (self.region.center.Tx.value,self.region.center.Ty.value)*u.arcsec) << u.arcsec,
             frame=submap.coordinate_frame
         )
         top_right = SkyCoord(
-            *( (self.region.center.Tx.value,self.region.center.Ty.value)*u.arcsec + self.region.radius*pad_mult ) << u.arcsec,
+            *( (self.region.center.Tx.value,self.region.center.Ty.value)*u.arcsec) << u.arcsec,
             frame=submap.coordinate_frame
         )
+
+        pix_reg = self.region.to_pixel(submap.wcs).bounding_box
+        width = pix_reg.ixmax - pix_reg.ixmin
+        height = pix_reg.iymax - pix_reg.iymin
         x0, y0 = bottom_left.to_pixel(submap.wcs)
+        x0 -= pad_mult * width / 2
+        y0 -= pad_mult * height / 2
         x1, y1 = top_right.to_pixel(submap.wcs)
+        x1 += pad_mult * width / 2
+        y1 += pad_mult * height / 2
         ax.indicate_inset(
             bounds=(x0, y0, x1 - x0, y1 - y0),
             inset_ax=axins,
             edgecolor=indic_col,
-            linewidth=2,
+            linewidth=1,
             alpha=indic_col[-1],
             zorder=10
         )
