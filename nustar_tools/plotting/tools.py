@@ -46,7 +46,7 @@ def save_plot(fig, fig_dir, fig_name, type='png'):
     if ext not in fig_name:
         fig_name = fig_name + ext
     # fig.patch.set_alpha(0) # Make the border transparent
-    plt.savefig(fig_dir+fig_name, bbox_inches='tight')
+    plt.savefig(fig_dir+fig_name)
 
 
 def get_frame_limits(evt_data, frame_length):

@@ -70,7 +70,7 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
     # Adjust the size if plotting both maps.
     if b_plot_detmap:
         fig_size = fig.get_size_inches()
-        fig_size[0] = fig_size[0] *     2
+        fig_size[0] = fig_size[0] * 2
         fig = plt.figure(figsize=fig_size)
 
     # Plot the count data.
@@ -81,13 +81,13 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
     norm1 = nustar_submap.plot_settings['norm']
     
     limb = nustar_submap.draw_limb(color='white', linestyle='dotted', zorder=0, label='Solar disk')
-    ax1.set(xlabel='x [arcsec]', ylabel='y [arcsec]')
+    ax1.set(xlabel='X [arcsec]', ylabel='Y [arcsec]')
     ax1.grid(False)
 
-    cbax1, cb1 = mtools.apply_colorbar(
+    cb1 = mtools.apply_colorbar(
         fig, ax1,
-        norm=norm1, cmap=cmap1,
-        width=0.05,
+        norm=norm1,
+        cmap=cmap1,
         label='[DN/s]'
     )
 
@@ -97,7 +97,7 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
     if b_plot_detmap:
         ax2 = fig.add_subplot(122, projection=nustar_submap)
         fig, ax2, det_submap = maps.plot_det_map(evt_data, hdr, fig, ax2, corners=corners)
-        ax2.set(xlabel='x [arcsec]', ylabel='y [arcsec]', title='Detector Visualization')
+        ax2.set(xlabel='X [arcsec]', ylabel='Y [arcsec]', title='Detector Visualization')
         ax2.grid(False)
         map_axes.append(ax2)
         text_color = 'white'
@@ -251,7 +251,7 @@ def plot_fpm_maps(evt_file, time_interval=None,
         text_str = f'FPM {fpm}\n{fov.get_fov_string()}'
 
         text_color = 'black'
-        x_pos = 0.02 + i*0.5
+        x_pos = 0.05 + i*0.5
         mtools.text(
             x_pos, 0.89,
             text_str,
@@ -268,8 +268,8 @@ def plot_fpm_maps(evt_file, time_interval=None,
 
     ax.grid(False)
     ax.set(
-        xlabel='x [arcsecond]',
-        ylabel='y [arcsecond]',
+        xlabel='X [arcsec]',
+        ylabel='Y [arcsec]',
         title=f'{ax.get_title()} - {end_time}'
     )
 

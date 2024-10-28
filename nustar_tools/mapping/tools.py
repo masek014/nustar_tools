@@ -1,23 +1,23 @@
-import gc
-import math
-
 import astropy
 import astropy.units as u
-import photutils
+import gc
+import math
 import matplotlib
-import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import matplotlib.colors as mplcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import os
+import photutils
 import pickle
 import scipy.optimize as opt
 import sunpy.map
 
-from pylab import text
-from scipy import ndimage
-from astropy.time import Time
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
+from pylab import text
 from regions import PixCoord, CirclePixelRegion, RectangleSkyRegion
+from scipy import ndimage
 
 from ..utils import utilities
 
@@ -56,7 +56,7 @@ def save_map(fig, fig_dir, fig_name, type='png'):
     fig_name = fig_name + '.' + type
     fig_path = fig_dir + fig_name
     # fig.patch.set_alpha(0) # Make the border transparent
-    plt.savefig(fig_path, bbox_inches='tight')
+    plt.savefig(fig_path)
     print(f'Saved map to {fig_path}')
 
     # Clean up memory.
@@ -65,7 +65,7 @@ def save_map(fig, fig_dir, fig_name, type='png'):
     gc.collect()
 
 
-def get_pixel_conversion(bin_size):
+def get_pixel_conversion(bin_size: int) -> float:
     """
     Returns the pixel to arcsecond conversion factor based on
     the given bin_size.
@@ -82,41 +82,43 @@ def get_pixel_conversion(bin_size):
 # TODO: Incorporate this better.
 def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
 
-        bl, tr = get_subregion(
-            map_,
-            (region.center.Tx.value, region.center.Ty.value),
-            region.radius.value
-        )
-        region_submap = map_.submap(bottom_left=bl, top_right=tr)
-        levels = levels << u.percent
-        fig, ax = plt.subplots(subplot_kw=dict(projection=region_submap))
-        cs = region_submap.draw_contours(
-            levels,
-            axes=ax,
-            cmap='Grays'
-        )
-        region_submap.plot(axes=ax)
-        plt.savefig(os.path.join(out_dir, 'contour_map.png'))
-        
-        cdelt = map_.scale[0].to(u.arcsec/u.pix)
-        areas = {}
-        for i in range(len(levels)):
-            contour = cs.collections[i]
-            if contour.get_paths():
-                vs = contour.get_paths()[0].vertices
-                x = vs[:,0]
-                y = vs[:,1]
-                area = 0.5*np.sum(y[:-1]*np.diff(x) - x[:-1]*np.diff(y)) << u.pix**2
-                area = np.abs(area) * cdelt * cdelt
-                areas[levels[i]] = area
-            else:
-                areas[levels[i]] = np.nan
+    apply_style()
 
-        pickle_path = os.path.join(out_dir, 'contours.pkl')
-        with open(pickle_path, 'wb') as outfile:
-            pickle.dump(areas, outfile)
+    bl, tr = get_subregion(
+        map_,
+        (region.center.Tx.value, region.center.Ty.value),
+        region.radius.value
+    )
+    region_submap = map_.submap(bottom_left=bl, top_right=tr)
+    levels = levels << u.percent
+    fig, ax = plt.subplots(subplot_kw=dict(projection=region_submap))
+    cs = region_submap.draw_contours(
+        levels,
+        axes=ax,
+        cmap='Grays'
+    )
+    region_submap.plot(axes=ax)
+    plt.savefig(os.path.join(out_dir, 'contour_map.png'))
+    
+    cdelt = map_.scale[0].to(u.arcsec/u.pix)
+    areas = {}
+    for i in range(len(levels)):
+        contour = cs.collections[i]
+        if contour.get_paths():
+            vs = contour.get_paths()[0].vertices
+            x = vs[:,0]
+            y = vs[:,1]
+            area = 0.5*np.sum(y[:-1]*np.diff(x) - x[:-1]*np.diff(y)) << u.pix**2
+            area = np.abs(area) * cdelt * cdelt
+            areas[levels[i]] = area
+        else:
+            areas[levels[i]] = np.nan
 
-        return areas
+    pickle_path = os.path.join(out_dir, 'contours.pkl')
+    with open(pickle_path, 'wb') as outfile:
+        pickle.dump(areas, outfile)
+
+    return areas
 
 
 def rebin_data(in_map, new_size):
@@ -183,7 +185,7 @@ def apply_contour(submap, cmap, dmin, dmax):
     comp_map.plot()
 
 
-def apply_colorbar(fig, ax, width=0.05, **kwargs):
+def apply_colorbar(fig, ax, norm, cmap, **kwargs):
     """
     Adds a colorbar to the map plot.
     A new axes object is created to house the colorbar.
@@ -207,15 +209,20 @@ def apply_colorbar(fig, ax, width=0.05, **kwargs):
         The newly created colorbar.
     """
 
-    default_kwargs = {
-        'spacing': 'uniform'
-    }
+    default_kwargs = dict(
+        aspect=20,
+        pad=0.05
+    )
     kwargs = {**default_kwargs, **kwargs}
 
-    cbax = ax.inset_axes([1.01, 0, width, 1])
-    cb = matplotlib.colorbar.ColorbarBase(cbax, **kwargs)
+    cbar = fig.colorbar(
+        cm.ScalarMappable(norm=norm, cmap=cmap),
+        ax=ax,
+        **kwargs
+    )
+    cbar.ax.yaxis.set_minor_formatter('')
 
-    return cbax, cb
+    return cbar
 
 
 def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
@@ -255,11 +262,11 @@ def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
     bounds = np.linspace(cb_min-step, cb_max+step, num_segments+1)
     norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
 
-    cbax, cb = apply_colorbar(fig, ax, width=width,
-        norm=norm, label=label, cmap=cmap,
+    cb = apply_colorbar(fig, ax,
+        norm=norm, cmap=cmap, label=label,
         ticks=ticks, boundaries=bounds, format=format)
 
-    return cbax, cb
+    return cb
 
 
 def find_min_max(map_data, rebin_size=1, b_make_square=True, b_padding=True):
