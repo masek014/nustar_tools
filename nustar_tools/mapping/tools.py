@@ -16,7 +16,7 @@ import sunpy.map
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from pylab import text
-from regions import PixCoord, CirclePixelRegion, RectangleSkyRegion
+from regions import PixCoord, CirclePixelRegion, RectangleSkyRegion, CircleSkyRegion
 from scipy import ndimage
 
 from ..utils import utilities
@@ -984,6 +984,18 @@ def get_sky_from_arcseconds(time, solar_pos, **kwargs):
     sky_pos = offset + sun_pos
 
     return sky_pos
+
+
+def get_arcsecond_coordinates(region: CircleSkyRegion) -> tuple[float, float, float]:
+    """
+    Returns the x, y, radius coordinates of the circle.
+    """
+    
+    x = region.center.Tx.arcsec
+    y = region.center.Ty.arcsec
+    r = region.radius.value
+
+    return x, y, r
 
 
 def pixcoord_map_transform(map1, map2, x, y, map_pixcoord=None):

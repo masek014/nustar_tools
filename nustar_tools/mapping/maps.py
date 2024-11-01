@@ -480,14 +480,21 @@ def make_event_map(event, axes_limits=[], b_add_spec_region=True, b_add_fov=True
     ax.set_title(f'NuSTAR Eventmap {event.event_id} {event.start}')
 
     if b_add_spec_region:
+        
         pix_reg = event.spec_region.to_pixel(event_submap.wcs)
         init_pix_reg = event.initial_spec_region.to_pixel(event_submap.wcs)
-        center_x, center_y, radius = event.get_arcsecond_coordinates()
+        center_x, center_y, radius = mtools.get_arcsecond_coordinates(event.spec_region)
         coord_str = f'c: ({center_x:.2f}\", {center_y:.2f}\") r: {radius:.2f}\"'
         pix_reg.plot(ax=ax, edgecolor='red', linestyle='dashed',
             label=f'spec coords:, {coord_str}')
         init_pix_reg.plot(ax=ax, edgecolor='blue', linestyle='dashed')
-        # ax.legend(prop={'size': 12})
+        
+        pix_reg = event.background_spec_region.to_pixel(event_submap.wcs)
+        init_pix_reg = event.initial_spec_region.to_pixel(event_submap.wcs)
+        center_x, center_y, radius = mtools.get_arcsecond_coordinates(event.background_spec_region)
+        coord_str = f'c: ({center_x:.2f}\", {center_y:.2f}\") r: {radius:.2f}\"'
+        pix_reg.plot(ax=ax, edgecolor='orange', linestyle='dotted',
+            label=f'spec coords:, {coord_str}')
 
     if b_add_fov:
         fov = FOV(event.evt_data, event.hdr)
