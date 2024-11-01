@@ -8,6 +8,7 @@ import nustar_pysolar as nustar
 import photutils
 import sunpy.map
 
+from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time
 from regions import CircleSkyRegion, PixCoord, RectanglePixelRegion, SkyRegion
@@ -435,81 +436,6 @@ def make_cluster_map(evt_file, fig_dir, clusters_list, axes_limits=[],
         print(f'Cluster map {fig_path} already exists. Skipping.')
 
 
-def make_event_map(event, axes_limits=[], b_add_spec_region=True, b_add_fov=True, b_zoom=False):
-    """
-    Plots the event heatmap on the solar disk.
-
-    Parameters
-    ----------
-    event : Event object
-        The event to be mapped.
-    axes_limits : list
-        The limits bounding the plotting area,
-        in arcseconds (xmin, ymin, xmax, ymax).
-    b_add_spec_region : bool
-        Specifies whether the emission region should
-        be plotted on the map.
-    b_add_fov : bool
-        Specifies whether NuSTAR's FOV during the event
-        should be plotted on the map.
-    b_zoom : bool
-        Specifies whether the map should be zoomed in around the macropixels.
-        If false, the axes bounds will be determined based on the photon hits.
-
-    Returns
-    -------
-    fig : matplotlib figure
-        The figure corresponding to the map.
-    ax : matplotlib axes
-        The axes corresponding to the map.
-    event_submap : Sunpy map
-        The map containing the plotted event.
-    """
-
-    mtools.apply_style()
-
-    data_array = event.make_counts_array()
-
-    if not b_zoom and not axes_limits:
-        corners = mtools.find_min_max(event.nustar_map.data)
-        axes_limits = list(corners)
-
-    event_submap, fig, ax, _ = mtools.apply_map_settings(event.event_map, corners=axes_limits,
-        cmap='viridis', norm=mplcolors.Normalize(0, np.max(data_array)),
-        label='Counts')
-    ax.set_title(f'NuSTAR Eventmap {event.event_id} {event.start}')
-
-    if b_add_spec_region:
-        
-        pix_reg = event.spec_region.to_pixel(event_submap.wcs)
-        init_pix_reg = event.initial_spec_region.to_pixel(event_submap.wcs)
-        center_x, center_y, radius = mtools.get_arcsecond_coordinates(event.spec_region)
-        coord_str = f'c: ({center_x:.2f}\", {center_y:.2f}\") r: {radius:.2f}\"'
-        pix_reg.plot(ax=ax, edgecolor='red', linestyle='dashed',
-            label=f'spec coords:, {coord_str}')
-        init_pix_reg.plot(ax=ax, edgecolor='blue', linestyle='dashed')
-        
-        pix_reg = event.background_spec_region.to_pixel(event_submap.wcs)
-        init_pix_reg = event.initial_spec_region.to_pixel(event_submap.wcs)
-        center_x, center_y, radius = mtools.get_arcsecond_coordinates(event.background_spec_region)
-        coord_str = f'c: ({center_x:.2f}\", {center_y:.2f}\") r: {radius:.2f}\"'
-        pix_reg.plot(ax=ax, edgecolor='orange', linestyle='dotted',
-            label=f'spec coords:, {coord_str}')
-
-    if b_add_fov:
-        fov = FOV(event.evt_data, event.hdr)
-        fov.plot(event_submap, ax)
-        spec_str = f'Spec. center: ({center_x:.2f}\", {center_y:.2f}\") Spec. radius: {radius:.2f}\"'
-        fov_str = fov.get_fov_string()
-        # text(0.02, 0.90, spec_str + '\n' + fov_str, fontsize=12,
-        #   color='black', va='center', transform=ax.transAxes)
-
-    ax.grid(False)
-    mtools.save_map(fig, event.event_dir, 'eventmap')
-
-    return fig, ax, event_submap
-
-
 def generate_maps(id_dir):
     """
     Generate maps using the data in the provided data ID directory.
@@ -602,7 +528,8 @@ class FOV():
         """
         Moves the center of the provided region to the brightest pixel.
         """
-
+        
+        print(np.sum(self.data_map.data))
         reg_data = mtools.get_region_data(region.to_pixel(self.data_map.wcs),
             self.data_map.data, b_full_size=True)
 
@@ -722,7 +649,7 @@ class FOV():
 
     def fit_region(
         self,
-        region: SkyRegion,
+        region_kwargs: dict,
         fit_coordinate_center: bool = True,
         fit_within_detector_edges: bool = True,
         fit_within_chipgap: bool = True
@@ -743,16 +670,20 @@ class FOV():
             Contains the new coordinates in the format:
             (center_x, center_y, radius) in arcseconds.
         """
+        
+        region_class = region_kwargs.pop('region_class')
+        center = region_kwargs.pop('center')
+        center = SkyCoord(*center, frame=self.data_map.coordinate_frame)
+        region = region_class(center=center, **region_kwargs)
 
-        reg = copy.deepcopy(region)
         if fit_coordinate_center:
-            reg = self.fit_coordinate_center(reg)
+            region = self.fit_coordinate_center(region)
         if fit_within_detector_edges:
-            reg = self.fit_region_within_edges(reg)
+            region = self.fit_region_within_edges(region)
         if fit_within_chipgap:
-            reg = self.fit_region_within_chipgap(reg)
+            region = self.fit_region_within_chipgap(region)
 
-        return reg
+        return region
 
 
     def get_fov_string(self):
