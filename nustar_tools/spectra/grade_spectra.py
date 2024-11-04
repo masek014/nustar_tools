@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
 from astropy.time import Time
 from dataclasses import dataclass
 
@@ -75,6 +76,14 @@ class GradeSpectrum():
     def label(self):
         return f'FPM {self.fpm}, Grade {self.grade}'
 
+    @property
+    def exposure(self) -> u.Quantity:
+
+        with fits.open(self.grade_file) as hdu:
+            hdr = hdu[1].header
+        
+        return hdr['EXPOSURE'] << u.second
+
     
     def plot(self, ax: plt.Axes = None) -> plt.Axes:
 
@@ -107,7 +116,7 @@ class GradeCollection():
         fpmA_kwargs: dict = {},
         fpmB_kwargs: dict = {}
     ):
-        
+
         default_fpmA_kwargs = dict(
             cmap='turbo'
         )
