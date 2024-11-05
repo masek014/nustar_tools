@@ -15,6 +15,7 @@ dependencies = [
     "parse",
     "photutils",
     "regions",
+    "ruptures",
     "scipy",
     "scikit-image",
     "sunpy"
