@@ -1,7 +1,11 @@
 [project]
-dynamic = ["version", "authors", "license"]
-requires-python = ">=3.10"
+dynamic = ["version"]
 name = "nustar_tools"
+license = {file = "LICENSE.md"}
+description = "Fundamental package for array computing in Python"
+authors = [{name = "Reed B. Masek"}]
+readme = "README.md"
+requires-python = ">=3.10"
 dependencies = [
     "astropy",
     "imageio",
@@ -15,7 +19,6 @@ dependencies = [
     "scikit-image",
     "sunpy"
 ]
-readme = "README.md"
 
 [build-system]
 requires = ["setuptools >= 61.0", "wheel"]
@@ -23,3 +26,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
 version = {attr = "nustar_tools.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["nustar_tools*"]
+exclude = ["*test_files"]

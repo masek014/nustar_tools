@@ -1,6 +1,0 @@
-include requirements.txt
-include nustar_tools/plotting/styles/*
-include nustar_tools/mapping/styles/*
-include nustar_tools/utils/default_conf.ini
-
-recursive-include data *
