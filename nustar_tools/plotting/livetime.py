@@ -200,7 +200,7 @@ def make_livetime_plot(hk_file, fig_dir='./', file_name='livetime',
     """
 
     LIVE_CONFIG = {}
-    utilities.apply_config_settings(LIVE_CONFIG, 'LivetimeSettings', conf_file)
+    # utilities.apply_config_settings(LIVE_CONFIG, 'LivetimeSettings', conf_file)
     ptools.apply_style()
 
     id_dir = utilities.get_id_dir_from_hk_file(hk_file)
@@ -231,7 +231,8 @@ def make_livetime_plot(hk_file, fig_dir='./', file_name='livetime',
     ax.plot_date(dates, livetimes, color='purple', linestyle='solid',
         marker='', drawstyle='steps')
 
-    saa, eclipses = find_saa_and_eclipses(dates, livetimes, LIVE_CONFIG['LT_BOXCAR_WIDTH'])
+    avg_width = 20
+    saa, eclipses = find_saa_and_eclipses(dates, livetimes, avg_width)
         
     # Add the saa lines.
     for pair in saa:

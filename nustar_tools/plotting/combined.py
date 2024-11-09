@@ -35,7 +35,7 @@ def combine_plots(id_dir, fpm, frame_length, energy_range,
     """
 
     ptools.apply_style()
-    utilities.apply_config_settings(CMBN_CONFIG, 'LightcurveSettings', conf_file)
+    # utilities.apply_config_settings(CMBN_CONFIG, 'LightcurveSettings', conf_file)
 
     # Specify plot positions in the grid.
     lightcurve_position = [0.1, 0.655, 0.8, 0.25]

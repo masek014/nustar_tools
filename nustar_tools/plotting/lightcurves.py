@@ -342,7 +342,7 @@ def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
     """
 
     ptools.apply_style()
-    utilities.apply_config_settings(LTCV_CONFIG, 'LightcurveSettings', CONF_FILE)
+    # utilities.apply_config_settings(LTCV_CONFIG, 'LightcurveSettings', CONF_FILE)
 
     evt_data, hdr = utilities.get_event_data(evt_file)
     start, end, num_frames = utilities.characterize_frames(evt_data, frame_length)
@@ -375,20 +375,24 @@ def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
         end_dt = utilities.convert_nustar_time_to_datetime(pair[1])
         ptools.add_event_lines(ax, start_dt, end_dt, linestyle='dashed', color='red')
     
-    if LTCV_CONFIG['B_ADD_SMOOTHED']:
+    add_smoothed = False
+    add_derivative = False
+    add_smoothed_derivative = False
+    add_derivative_zeros = False
+    if add_smoothed:
         smoothed_line = ptools.add_smoothed_curve(ax, rates_line,
             color='black', label='Smoothed count rates')
         line_list.append(smoothed_line)
     
-    b_derivatives = LTCV_CONFIG['B_ADD_DERIVATIVE'] or \
-                    LTCV_CONFIG['B_ADD_SMOOTHED_DERIVATIVE'] or \
-                    LTCV_CONFIG['B_ADD_DERIVATIVE_ZEROS']
+    b_derivatives = add_derivative or \
+                    add_smoothed_derivative or \
+                    add_derivative_zeros
 
     if b_derivatives:
         derivative_lines = ptools.plot_derivative(ax, rates_line,
-            LTCV_CONFIG['B_ADD_DERIVATIVE'],
-            LTCV_CONFIG['B_ADD_SMOOTHED_DERIVATIVE'],
-            LTCV_CONFIG['B_ADD_DERIVATIVE_ZEROS'])
+            add_derivative,
+            add_smoothed_derivative,
+            add_derivative_zeros)
         line_list += derivative_lines
 
     # Add the legend.
