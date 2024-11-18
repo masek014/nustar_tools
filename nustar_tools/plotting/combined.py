@@ -10,7 +10,7 @@ CMBN_CONFIG = {
 
 
 def combine_plots(id_dir, fpm, frame_length, energy_range,
-    mp_array=None, fig_dir='./', file_name='combined_plot',
+    fig_dir='./', file_name='combined_plot',
     conf_file=utilities.CONF_FILE):
     """
     Parameters
@@ -23,9 +23,6 @@ def combine_plots(id_dir, fpm, frame_length, energy_range,
         The length of the time bins, in seconds.
     energy_range : tuple
         The energy range (min, max) to be plotted, in keV.
-    mp_array : MacropixelArray
-        The MacropixelArray containing events. The time ranges of
-        the events will be plotted on top of the light curve.
     fig_dir : str
         The output directory of the saved image.
     file_name : str
@@ -55,7 +52,7 @@ def combine_plots(id_dir, fpm, frame_length, energy_range,
 
     _, lightcurve_axis = lightcurves.make_observation_lightcurve(evt_file, hk_file,
         frame_length=frame_length, energy_range=energy_range,
-        axes_position=lightcurve_position, mp_array=mp_array)
+        axes_position=lightcurve_position)
     lightcurve_axis.set_xticklabels([])
     lightcurve_axis.set_xlabel('')
 

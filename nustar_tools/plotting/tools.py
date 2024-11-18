@@ -75,30 +75,6 @@ def get_frame_limits(evt_data, frame_length):
     return x_min, x_max
 
 
-def get_stair_datetimes(stair):
-    """
-    Converts the timestamps from a matplotlib stair (patch) object into
-    an array of datetime objects.
-
-    Parameters
-    ----------
-    stair : matplotlib patch
-        The stair for which the times will be converted.
-
-    Returns
-    -------
-    dt_times : np.array of datetime
-        The converted array containing the datetime objects
-        for the provided stair.
-    """
-
-    stair_times = stair.get_data()[1]
-    unix_times = stair_times*24*60*60
-    dt_times = np.array([utilities.datetime.fromtimestamp(t, tz=utilities.timezone.utc) for t in unix_times])
-
-    return dt_times
-
-
 def choose_tick_interval(x_min, x_max, b_datetime=True):
     """
     Chooses the best interval (in minutes)
@@ -339,101 +315,6 @@ def plot_derivative(ax, line, b_add_derivative=True, b_add_smoothed=False, b_add
 
     return lines
 
-
-def add_event_lines(axes, start_time, end_time, b_vertical=True, b_shaded=False, **kwargs):
-    """
-    Adds two vertical lines to the plot using the
-    provided input times.
-
-    Parameters
-    ----------
-    axes : matplotlib axes
-        The axes to which the lines will be applied
-    start_time : datetime.datetime
-        The time of the first vertical line.
-    end_time : datetime.datetime
-        The time of the second vertical line.
-    b_shaded : bool
-        Specify if the region between the two vertical lines
-        will be shaded.
-    kwargs : dict
-        Keyword arguments for the cosmetic features of the lines.
-    """
-
-    default_kwargs = {'color': 'black', 'linestyle': 'dashed', 'linewidth': 1}
-    kwargs = {**default_kwargs, **kwargs}
-
-    x_dat = get_stair_datetimes(axes.patches[0]) # Get stair time edges
-
-    # Add the vertical lines.
-    """if b_vertical or (start_time == end_time):
-
-        if b_shaded:
-            start_index = np.argmax(x_dat>=start_time)
-            end_index = np.argmin(x_dat<=end_time)-1
-            start_edge = x_dat[start_index]
-            end_edge = x_dat[end_index]
-        else:
-            start_edge = start_time + utilities.timedelta(seconds=(x_dat[2]-x_dat[1]).total_seconds())
-            end_edge = end_time - utilities.timedelta(seconds=(x_dat[2]-x_dat[1]).total_seconds())
-
-        axes.axvline(x=start_edge, **kwargs)
-        axes.axvline(x=end_edge, **kwargs)"""
-    
-    # Shade the region between the lines.
-    if b_shaded:
-        start_bools = x_dat >= start_time
-        end_bools = x_dat <= end_time
-        bool_arr = [start_bools[i] and end_bools[i] for i in range(0, np.size(start_bools))]
-        axes.fill_between(x_dat, 0, 1, where=bool_arr,
-                color=kwargs['color'], alpha=0.3, transform=axes.get_xaxis_transform())
-
-
-def add_events(ax, events_dict, color='lightsteelblue', frame_labelsize=matplotlib.rcParams['font.size']/2):
-    """
-    Shades the event time intervals for all events contained in events_dict.
-    The start frames of each event are marked on the top x-axis (or set 
-    frame_labelsize=0 for no marking).
-
-    Parameters
-    ----------
-    ax : matplotlib axes
-        The axes on which the shaded regions will be drawn.
-    events_dict : dict
-        A dictionary containing the events.
-        key = frame number, value = list of events.
-    color : str
-        The color of the shaded regions.
-    frame_labelsize : int
-        The font size for the event frame numbers.
-    
-    Returns
-    -------
-    xax2 : matplotlib axes or None
-        The top x-axis on which the frame numbers were marked.
-    """
-
-    starts, ids, time_pairs = [], [], []
-    for key in events_dict.keys():
-        for event in events_dict[key]:
-            start = utilities.convert_string_to_datetime(event.start)
-            end = utilities.convert_string_to_datetime(event.end)
-            time_pairs.append([start, end])
-            if start not in starts:
-                starts.append(start)
-                ids.append((event.event_id).split('-')[0])
-
-    for pair in time_pairs:
-        add_event_lines(ax, pair[0], pair[1],
-            b_vertical=True, b_shaded=True, linestyle='dotted', color=color)
-
-    xax2 = None
-    if frame_labelsize > 0:
-        xax2 = ax.twiny()
-        xax2.set(xlim=ax.get_xlim(), xticks=starts, xticklabels=ids)
-        xax2.tick_params(axis='x', labelsize=frame_labelsize)
-
-    return xax2
 
 def add_skewnorm(time_edges, ax, amp, a, loc, scale, background=None):
     """

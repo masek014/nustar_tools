@@ -308,7 +308,7 @@ def make_event_macropixel_lightcurves(event, fig_dir='', file_name=''):
 
 
 def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
-    axes_position=[], mp_array=None, fig_dir='', file_name='lightcurve'):
+    axes_position=[], fig_dir='', file_name='lightcurve'):
     """
     Make the light curve for the given event file.
 
@@ -325,9 +325,6 @@ def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
     axes_position : list
         A list containing position of the axes. This is used when
         including the light curve plot as a subplot.
-    mp_array : MacropixelArray
-        The MacropixelArray containing events. The time ranges of
-        the events will be plotted on top of the light curve.
     fig_dir : str
         The directory where the figure will be saved.
     file_name : str
@@ -400,22 +397,13 @@ def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
         labs = [l.get_label() for l in line_list]
         ax.legend(line_list, labs, loc=0)
 
-    # If an event dictionary is provided, plot the start and end times.
-    param_str = ''
-    if mp_array is not None:
-        d_thresh = mp_array.detection_threshold
-        c_thresh = mp_array.connection_threshold
-        param_str = r'$\sigma _d =$ ' + str(d_thresh) + r' $\sigma_c =$ ' + str(c_thresh) + ', '
-        file_name += '_events'
-        xax2 = ptools.add_events(ax, mp_array.events_dict)
-
     in_fpm = utilities.get_fpm_from_filename(evt_file)
     time_range = (utilities.convert_nustar_time_to_string(time_edges[0]),
         utilities.convert_nustar_time_to_string(time_edges[-1]))
     avg_livetime = round(livetime.compute_average_livetime(hk_file, time_range)*100,2)
     yyyymmdd = utilities.convert_nustar_time_to_string(time_edges[0]).split(' ')[0]
-    title_str = f'NuSTAR FPM{in_fpm} {energy_range[0]}-{energy_range[1]} keV, '+\
-        f'{param_str}\nLight Curve - {yyyymmdd} (Avg. Livetime {avg_livetime}%)'
+    title_str = f'NuSTAR FPM {in_fpm} {energy_range[0]}-{energy_range[1]} keV lightcurve, '+\
+        f'\n{yyyymmdd} (avg. livetime {avg_livetime}%)'
     ax.set_title(title_str)
 
     if not axes_position:
