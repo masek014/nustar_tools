@@ -529,13 +529,12 @@ class FOV():
         Moves the center of the provided region to the brightest pixel.
         """
         
-        print(np.sum(self.data_map.data))
         reg_data = mtools.get_region_data(region.to_pixel(self.data_map.wcs),
             self.data_map.data, b_full_size=True)
 
         # Ensure the array does not contain only zeros.
         if reg_data.any():
-            idxs = np.argsort(reg_data.ravel())[-10:] # 10 brightest pixels
+            idxs = np.argsort(reg_data.ravel())[-20:] # 20 brightest pixels
             rows, cols = idxs//reg_data.shape[0], idxs%reg_data.shape[1]
             x, y = np.mean(cols), np.mean(rows)
             # y, x = np.unravel_index(reg_data.argmax(), reg_data.shape) # brightest pixel
