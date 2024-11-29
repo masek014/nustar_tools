@@ -289,8 +289,8 @@ def make_event_macropixel_lightcurves(event, fig_dir='', file_name=''):
         x = x - min_x - 1
         y = max_y - y
 
-        ptools.add_event_lines(ax[y,x], start_dt, end_dt,
-            b_vertical=True, b_shaded=True, linestyle='dotted', color='steelblue',)
+        # ptools.add_event_lines(ax[y,x], start_dt, end_dt,
+        #     b_vertical=True, b_shaded=True, linestyle='dotted', color='steelblue',)
 
         # Zoom into the the event time range.
         time_padding = 120
@@ -367,10 +367,10 @@ def make_observation_lightcurve(evt_file, hk_file, frame_length, energy_range,
     line_list = [rates_line] # Used for creating the legend
 
     # Add the deadtime lines.
-    for pair in deadtimes:
-        start_dt = utilities.convert_nustar_time_to_datetime(pair[0])
-        end_dt = utilities.convert_nustar_time_to_datetime(pair[1])
-        ptools.add_event_lines(ax, start_dt, end_dt, linestyle='dashed', color='red')
+    # for pair in deadtimes:
+    #     start_dt = utilities.convert_nustar_time_to_datetime(pair[0])
+    #     end_dt = utilities.convert_nustar_time_to_datetime(pair[1])
+        # ptools.add_event_lines(ax, start_dt, end_dt, linestyle='dashed', color='red')
     
     add_smoothed = False
     add_derivative = False

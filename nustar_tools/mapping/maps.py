@@ -541,6 +541,9 @@ class FOV():
             # x, y = photutils.centroids.centroid_com(reg_data) # center of mass
             com_sky = PixCoord(x, y).to_sky(self.data_map.wcs)
             new_region = CircleSkyRegion(com_sky, radius=region.radius)
+            if self.check_region_outside_fov(new_region) > 0:
+                print('WARNING: new center was outside FOV. Defaulting to input region')
+                new_region = region # Default to original region
         else:
             print('Submap contains only zeros. Not fitting region center.')
             new_region = region
