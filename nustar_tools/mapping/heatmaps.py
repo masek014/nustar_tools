@@ -5,7 +5,6 @@ from ..utils import utilities
 from . import tools as mtools
 
 
-
 def make_square(row_coords, col_coords):
     """
     Rebuild the provided coordinates lists so that the lists
@@ -19,7 +18,7 @@ def make_square(row_coords, col_coords):
     if num_rows != num_cols:
         diff = abs(num_rows - num_cols)
         left_pad = int(diff/2)
-        right_pad = int(diff/2) + diff%2
+        right_pad = int(diff/2) + diff % 2
         if num_rows < num_cols:
             num_rows = num_cols
             for i in range(1, left_pad+1):
@@ -60,9 +59,9 @@ def set_heatmap_ticks(ax, x_labels, y_labels):
 
 
 def plot_heatmap(arr, x_tick_labels=[], y_tick_labels=[],
-    xlabel='X Coordinate', ylabel='Y Coordinate', title='',
-    b_count_labels=True, fig_dir='./', file_name='heatmap',
-    **cb_kwargs):
+                 xlabel='X Coordinate', ylabel='Y Coordinate', title='',
+                 b_count_labels=True, fig_dir='./', file_name='heatmap',
+                 **cb_kwargs):
     """
     Make a heatmap using the Macropixels in a given Event.
     The heatmap shows how many times a macropixel was included
@@ -125,7 +124,7 @@ def plot_heatmap(arr, x_tick_labels=[], y_tick_labels=[],
                 else:
                     c = 'white'
                 text = ax.text(j, i, count_val, fontsize=matplotlib.rcParams['font.size'],
-                    ha='center', va='center', color=c)
+                               ha='center', va='center', color=c)
 
     mtools.save_map(fig, fig_dir, file_name)
 

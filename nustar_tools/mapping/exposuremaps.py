@@ -10,13 +10,15 @@ from . import maps, tools as mtools
 from .movies import make_movies
 from ..utils import utilities
 
-warnings.simplefilter('ignore') # Suppress astropy warning about changing dates
+# Suppress astropy warning about changing dates
+warnings.simplefilter('ignore')
 
 
-def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
-    b_plot_fov=True, b_plot_detmap=True, b_fit_gaussian=False,
-    b_add_contours=False, corners=None,
-    fig_dir='', file_name='exposure_map'):
+def plot_exposure_maps(
+        evt_data, hdr, region_kwargs=None,
+        b_plot_fov=True, b_plot_detmap=True, b_fit_gaussian=False,
+        b_add_contours=False, corners=None,
+        fig_dir='', file_name='exposure_map'):
     """
     Make an exposure map for the provided event list.
     An exposure map shows the normalized pixel counts.
@@ -79,8 +81,9 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
     cmap1 = plt.get_cmap('Spectral_r')
     nustar_submap.plot(cmap=cmap1)
     norm1 = nustar_submap.plot_settings['norm']
-    
-    limb = nustar_submap.draw_limb(color='white', linestyle='dotted', zorder=0, label='Solar disk')
+
+    limb = nustar_submap.draw_limb(
+        color='white', linestyle='dotted', zorder=0, label='Solar disk')
     ax1.set(xlabel='X [arcsec]', ylabel='Y [arcsec]')
     ax1.grid(False)
 
@@ -96,8 +99,10 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
 
     if b_plot_detmap:
         ax2 = fig.add_subplot(122, projection=nustar_submap)
-        fig, ax2, det_submap = maps.plot_det_map(evt_data, hdr, fig, ax2, corners=corners)
-        ax2.set(xlabel='X [arcsec]', ylabel='Y [arcsec]', title='Detector Visualization')
+        fig, ax2, det_submap = maps.plot_det_map(
+            evt_data, hdr, fig, ax2, corners=corners)
+        ax2.set(xlabel='X [arcsec]', ylabel='Y [arcsec]',
+                title='Detector Visualization')
         ax2.grid(False)
         map_axes.append(ax2)
         text_color = 'white'
@@ -123,13 +128,14 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
         pix_region = spec_region.to_pixel(nustar_submap.wcs)
         for a in map_axes:
             pix_region.plot(ax=a, edgecolor='white',
-                linestyle='dotted', facecolor='white',
-                fill=True, alpha=0.25, label='Spec. Region')
+                            linestyle='dotted', facecolor='white',
+                            fill=True, alpha=0.25, label='Spec. Region')
 
         if b_add_contours:
             smoothed_submap = mtools.apply_gaussian_blur(nustar_submap, 2)
-            mtools.draw_nustar_contours(smoothed_submap, a, np.arange(80,100,0.1), spec_region, out_dir=fig_dir)
-        
+            mtools.draw_nustar_contours(smoothed_submap, a, np.arange(
+                80, 100, 0.1), spec_region, out_dir=fig_dir)
+
         if b_plot_detmap:
             dets_in_reg = mtools.find_dets_in_region(det_submap, pix_region)
             if -1 in dets_in_reg:
@@ -156,7 +162,9 @@ def plot_exposure_maps(evt_data, hdr, region_kwargs=None,
 
 
 # TODO: Finish this.
-def make_exposure_movie(evt_file, start, number_frames, time_step, exposure_time=60, corners=None, fig_dir=''):
+def make_exposure_movie(
+        evt_file, start, number_frames, time_step,
+        exposure_time=60, corners=None, fig_dir=''):
     """
     Make an exposure movie showing the time evolution of the event data.
 
@@ -175,7 +183,8 @@ def make_exposure_movie(evt_file, start, number_frames, time_step, exposure_time
 
     evt_data, hdr = utilities.get_event_data(evt_file)
     if corners is None:
-        m = maps.make_nustar_map(evt_data, hdr) # Used only for determining the bounding corners.
+        # Used only for determining the bounding corners.
+        m = maps.make_nustar_map(evt_data, hdr)
         corners = mtools.find_min_max(m.data)
 
     start_frame = 0
@@ -183,16 +192,17 @@ def make_exposure_movie(evt_file, start, number_frames, time_step, exposure_time
 
     for frame in range(start_frame, end_frame):
         frame_start = utilities.add_timedelta_to_string(start, time_step*frame)
-        frame_end = utilities.add_timedelta_to_string(frame_start, time_step+exposure_time)
+        frame_end = utilities.add_timedelta_to_string(
+            frame_start, time_step+exposure_time)
         frame_data = evt_data[utilities.nustar.filter.by_time(evt_data, hdr,
-            mtools.Time([frame_start, frame_end], format='iso', scale='utc'))]
+                                                              mtools.Time([frame_start, frame_end], format='iso', scale='utc'))]
         if len(frame_data) == 0:
-            continue # Don't plot empty frames
-        file_str = str(frame).rjust(len(str(number_frames)),'0')
+            continue  # Don't plot empty frames
+        file_str = str(frame).rjust(len(str(number_frames)), '0')
         if not utilities.os.path.exists(f'{fig_dir}/exposure_map{file_str}.png'):
             plot_exposure_maps(frame_data, hdr, b_plot_fov=True,
-                b_plot_detmap=True, b_fit_gaussian=False, corners=corners,
-                fig_dir=fig_dir, file_name=f'exopsure_map{file_str}')
+                               b_plot_detmap=True, b_fit_gaussian=False, corners=corners,
+                               fig_dir=fig_dir, file_name=f'exopsure_map{file_str}')
         else:
             print('Skipping ' + file_str)
 
@@ -204,8 +214,9 @@ def make_exposure_movie(evt_file, start, number_frames, time_step, exposure_time
     make_movies(fig_dir, folder_name)
 
 
-def plot_fpm_maps(evt_file, time_interval=None,
-    fig_dir='', file_name='fpm_map'):
+def plot_fpm_maps(
+        evt_file, time_interval=None,
+        fig_dir='', file_name='fpm_map'):
     """
     Plots the fields of view of both FPMs against the solar disk.
 
@@ -235,19 +246,20 @@ def plot_fpm_maps(evt_file, time_interval=None,
         nustar_map = maps.make_nustar_map(evt_data, hdr)
 
         if fig is None:
-            nustar_submap = mtools.get_submap(nustar_map, [-1500, -1500, 1500, 1500])
+            nustar_submap = mtools.get_submap(
+                nustar_map, [-1500, -1500, 1500, 1500])
             fig = plt.figure()
             ax = fig.add_subplot(111, projection=nustar_submap)
-            nustar_submap.data[:,:] = mtools.np.nan
-            nustar_submap.plot(norm=mplcolors.LogNorm(vmin=1,vmax=1))
+            nustar_submap.data[:, :] = mtools.np.nan
+            nustar_submap.plot(norm=mplcolors.LogNorm(vmin=1, vmax=1))
             limb = nustar_submap.draw_limb(color='black',
-                linestyle='dotted', zorder=0, label='Solar disk')
+                                           linestyle='dotted', zorder=0, label='Solar disk')
 
         fov = maps.FOV(evt_data, hdr)
         fov.plot(nustar_submap, ax,
-            b_draw_chip_gap=False, b_plot_center=False, b_plot_corners=False,
-            fill=True, alpha=0.5, facecolor=colors[i], edgecolor=colors[i],
-            linestyle='solid', label=f'FPM {fpm}')
+                 b_draw_chip_gap=False, b_plot_center=False, b_plot_corners=False,
+                 fill=True, alpha=0.5, facecolor=colors[i], edgecolor=colors[i],
+                 linestyle='solid', label=f'FPM {fpm}')
         text_str = f'FPM {fpm}\n{fov.get_fov_string()}'
 
         text_color = 'black'
@@ -262,7 +274,8 @@ def plot_fpm_maps(evt_file, time_interval=None,
         )
 
     if time_interval is None:
-        end_time = utilities.convert_nustar_time_to_string(evt_data['TIME'][-1]).split(' ')[-1]
+        end_time = utilities.convert_nustar_time_to_string(
+            evt_data['TIME'][-1]).split(' ')[-1]
     else:
         end_time = time_interval[1].split(' ')[-1]
 

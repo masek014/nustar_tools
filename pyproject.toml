@@ -2,7 +2,7 @@
 dynamic = ["version"]
 name = "nustar_tools"
 license = {file = "LICENSE.md"}
-description = "Fundamental package for array computing in Python"
+description = "Basic tools for plotting and mapping NuSTAR data"
 authors = [{name = "Reed B. Masek"}]
 readme = "README.md"
 requires-python = ">=3.10"
