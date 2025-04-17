@@ -1,22 +1,24 @@
-import astropy
-import astropy.units as u
 import gc
 import math
+import os
+import pickle
+
+import astropy
+import astropy.units as u
 import matplotlib
 import matplotlib.cm as cm
 import matplotlib.colors as mplcolors
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 import photutils
-import pickle
 import scipy.optimize as opt
 import sunpy.map
 
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
 from astropy.time import Time
 from pylab import text
-from regions import PixCoord, CirclePixelRegion, RectangleSkyRegion, CircleSkyRegion
+from regions import PixCoord, CirclePixelRegion, RectangleSkyRegion, CircleSkyRegion, PixelRegion
 from scipy import ndimage
 
 from ..utils import utilities
@@ -25,19 +27,18 @@ from ..utils import utilities
 STYLES_DIR = f'{utilities.os.path.dirname(utilities.os.path.realpath(__file__))}/styles/'
 
 
-def verify_config(config_dict):
-
-    checks = [('BIN_SIZE', int), ('GAUSS_BLUR_SIZE', int),
-              ('BOXCAR_WIDTH', int)]
-    utilities.verify_config_types(config_dict, checks)
-
-
 def apply_style():
     plt.style.use(f'{STYLES_DIR}map.mplstyle')
 
 
-def save_map(fig, fig_dir, fig_name, type='png'):
-    """
+def save_map(
+    fig: plt.Figure,
+    fig_dir: str,
+    fig_name: str,
+    type: str = 'png'
+):
+    '''Saves the provided figure to a file.
+
     Parameters
     ----------
     fig : matplotlib figure
@@ -48,15 +49,10 @@ def save_map(fig, fig_dir, fig_name, type='png'):
         The name of the figure.
     type : str
         The image type.
-
-    Ex: save_map(fig, '/Users/rbmasek/nustar/data/20150901/20110116001/figures/', 'nu20110116001A06_cl_sunpos', '.png')
-        makes an image file with the path /Users/rbmasek/nustar/data/20150901/20110116001/figures/nu20110116001A06_cl_sunpos.png
-    """
-
+    '''
     fig_dir = utilities.verify_path(fig_dir)
-    fig_name = fig_name + '.' + type
-    fig_path = fig_dir + fig_name
-    # fig.patch.set_alpha(0) # Make the border transparent
+    fig_name = f'{fig_name}.{type}'
+    fig_path = f'{fig_dir}{fig_name}'
     plt.savefig(fig_path)
     print(f'Saved map to {fig_path}')
 
@@ -67,16 +63,19 @@ def save_map(fig, fig_dir, fig_name, type='png'):
 
 
 def get_pixel_conversion(bin_size: int) -> float:
-    """
-    Returns the pixel to arcsecond conversion factor based on
+    '''Returns the pixel to arcsecond conversion factor based on
     the given bin_size.
 
     Parameters
     ----------
     bin_size : int
         The size of the bins in units of raw pixels.
-    """
 
+    Returns
+    -------
+    pixel_size: float
+        arcseconds per pixel
+    '''
     return 2.45810736 * bin_size
 
 
@@ -84,7 +83,6 @@ def get_pixel_conversion(bin_size: int) -> float:
 def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
 
     apply_style()
-
     bl, tr = get_subregion(
         map_,
         (region.center.Tx.value, region.center.Ty.value),
@@ -103,19 +101,17 @@ def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
 
     cdelt = map_.scale[0].to(u.arcsec/u.pix)
     areas = {}
-    for i in range(len(levels)):
+    for i, level in enumerate(levels):
         contour = paths[i]
         if contour:
             vs = contour.vertices
-            x = vs[:, 0]
-            y = vs[:, 1]
+            x, y = vs[:, 0], vs[:, 1]
             area = 0.5*np.sum(
                 y[:-1]*np.diff(x) - x[:-1] * np.diff(y)) << u.pix**2
             area = np.abs(area) * cdelt * cdelt
-            areas[levels[i]] = area
+            areas[level] = area
         else:
-            areas[levels[i]] = np.nan
-
+            areas[level] = np.nan
     pickle_path = os.path.join(out_dir, 'contours.pkl')
     with open(pickle_path, 'wb') as outfile:
         pickle.dump(areas, outfile)
@@ -124,18 +120,17 @@ def draw_nustar_contours(map_, ax, levels, region, out_dir='./'):
 
 
 def rebin_data(in_map, new_size):
-    """
-    Rebins the data to the specified rebin size.
-    """
-
-    dimensions = u.Quantity([new_size, new_size], u.pixel)
+    '''Rebins the data to the specified rebin size.'''
+    dimensions = [new_size, new_size] * u.pixel
 
     return in_map.superpixel(dimensions)
 
 
-def apply_gaussian_blur(in_map, std_dev=1.0):
-    """
-    Applies a Gaussian blur to the provided SunPy map.
+def apply_gaussian_blur(
+    in_map: sunpy.map.GenericMap,
+    std_dev: float = 1.0
+) -> sunpy.map.GenericMap:
+    '''Applies a Gaussian blur to the provided SunPy map.
 
     Parameters
     ----------
@@ -147,24 +142,32 @@ def apply_gaussian_blur(in_map, std_dev=1.0):
     Returns
     -------
     A new Sunpy map with the blur applied.
-    """
+    '''
+    smoothed_data = ndimage.gaussian_filter(
+        in_map.data, std_dev, mode='nearest')
 
-    return sunpy.map.Map(ndimage.gaussian_filter(in_map.data, std_dev, mode='nearest'), in_map.meta)
+    return sunpy.map.Map(smoothed_data, in_map.meta)
 
 
-def apply_contour(submap, cmap, dmin, dmax):
-    """
-    Applies contour lines to the map.
+def apply_contour(
+    submap: sunpy.map.GenericMap,
+    cmap: str,
+    dmin: float,
+    dmax: float
+):
+    '''Applies contour lines to the map.
 
     Parameters
     ----------
     submap : Sunpy map
         The input map.
+    cmap : str
+        The name of the colormap to use.
     dmin : float
         The minimum of the colorbar.
     dmax : float
         The maximum of the colorbar.
-    """
+    '''
 
     # Make a copy of our NuSTAR map.
     submap2 = sunpy.map.Map(submap.data, submap.meta)
@@ -188,9 +191,14 @@ def apply_contour(submap, cmap, dmin, dmax):
     comp_map.plot()
 
 
-def apply_colorbar(fig, ax, norm, cmap, **kwargs):
-    """
-    Adds a colorbar to the map plot.
+def apply_colorbar(
+    fig: plt.Figure,
+    ax: plt.Axes,
+    norm: object,
+    cmap: object,
+    **kwargs
+):
+    '''Adds a colorbar to the map plot.
     A new axes object is created to house the colorbar.
 
     Parameters
@@ -199,38 +207,31 @@ def apply_colorbar(fig, ax, norm, cmap, **kwargs):
         The figure to which to colorbar will be added.
     ax : matplotlib axes
         The axes to which the colorbar is applied.
-    width : float
-        The colorbar width as a fraction of the plot width.
+    norm : object
+        The normalization to use, e.g. matplotlib.colors.Normalize.
+    cmap : object
+        The colormap to use, e.g. matplotlib.pyplot.get_cmap('Grays').
     kwargs : dict
         Keyword arguments to the ColorbarBase method.
 
     Returns
     -------
-    cbax : matplotlib axes
-        The axes containing the colorbar.
-    cb : matplotlib colorbar
+    cbar : matplotlib colorbar
         The newly created colorbar.
-    """
-
-    default_kwargs = dict(
-        aspect=20,
-        pad=0.05
-    )
+    '''
+    default_kwargs = {'aspect': 20, 'pad': 0.05}
     kwargs = {**default_kwargs, **kwargs}
-
     cbar = fig.colorbar(
-        cm.ScalarMappable(norm=norm, cmap=cmap),
-        ax=ax,
-        **kwargs
-    )
+        cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, **kwargs)
     cbar.ax.yaxis.set_minor_formatter('')
 
     return cbar
 
 
-def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
-                            cmap=plt.get_cmap('jet'), width=0.05, format='%li', label=''):
-    """
+def apply_discrete_colorbar(
+        fig, ax, num_segments, cb_min, cb_max,
+        cmap=plt.get_cmap('jet'), width=0.05, format='%li', label=''):
+    '''
     Adds a colorbar to the map plot.
     A new axes object is created to house the colorbar.
     Inspired from: https://stackoverflow.com/a/14779462
@@ -256,8 +257,7 @@ def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
         The axes containing the colorbar.
     cb : matplotlib colorbar
         The newly created colorbar.
-    """
-
+    '''
     cmaplist = [cmap(i) for i in range(cmap.N)]
     cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
         'Det ID', cmaplist, cmap.N)
@@ -265,16 +265,21 @@ def apply_discrete_colorbar(fig, ax, num_segments, cb_min, cb_max,
     step = (ticks[1]-ticks[0])/2
     bounds = np.linspace(cb_min-step, cb_max+step, num_segments+1)
     norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
-
-    cb = apply_colorbar(fig, ax,
-                        norm=norm, cmap=cmap, label=label,
-                        ticks=ticks, boundaries=bounds, format=format)
+    cb = apply_colorbar(
+        fig, ax,
+        norm=norm, cmap=cmap, label=label,
+        ticks=ticks, boundaries=bounds, format=format)
 
     return cb
 
 
-def find_min_max(map_data, rebin_size=1, b_make_square=True, b_padding=True):
-    """
+def find_min_max(
+    map_data: np.ndarray,
+    rebin_size: int = 1,
+    make_square: bool = True,
+    padding: bool = True
+) -> list[float, float, float, float]:
+    '''
     Finds the two coordinate pairs specifying the minimum bounding
     box for the provided data. The purpose of this method is to
     "trim" the excess, zero-valued data so the resulting plot focuses
@@ -288,12 +293,12 @@ def find_min_max(map_data, rebin_size=1, b_make_square=True, b_padding=True):
     rebin_size : int
         This is the amount by which the rebinning modified the
         data, if the original (2999 x 2999) array was rebinned.
-    b_make_square : bool
+    make_square : bool
         If true, the resulting coordinates of the minimum bounding
         box are modified so that the returned coordinates form a
         square rather than a rectangle (primarily for
         aesthetic purposes).
-    b_padding : bool
+    padding : bool
         Specifies whether padding should be added around the edges.
 
     Returns
@@ -302,10 +307,9 @@ def find_min_max(map_data, rebin_size=1, b_make_square=True, b_padding=True):
     y_min
     x_max
     y_max
-    """
+    '''
 
     num_rows, num_cols = np.shape(map_data)
-
     top_index = 0
     bottom_index = num_rows
     left_index = num_cols
@@ -340,7 +344,7 @@ def find_min_max(map_data, rebin_size=1, b_make_square=True, b_padding=True):
     # + 500*math.tanh(0.2*rebin_size)
     x_max = ((right_index/num_cols) * 7200 - 3600)
 
-    if b_padding:
+    if padding:
         y_max += 500*math.tanh(0.2*rebin_size)
         y_min -= 500*math.tanh(0.2*rebin_size)
         x_min -= 500*math.tanh(0.2*rebin_size)
@@ -353,7 +357,7 @@ def find_min_max(map_data, rebin_size=1, b_make_square=True, b_padding=True):
     y_max = math.ceil(y_max)
 
     # Make the coordinates form a square with the same center point as the original.
-    if b_make_square:
+    if make_square:
         horizontal_length = x_max - x_min
         vertical_length = y_max - y_min
         diff = abs(horizontal_length - vertical_length)
@@ -380,48 +384,46 @@ def find_min_max(map_data, rebin_size=1, b_make_square=True, b_padding=True):
     return x_min, y_min, x_max, y_max
 
 
-def get_submap(map_obj, corners=None):
-    """
-    Create a submap of the provided map object.
+def get_submap(
+    map_: sunpy.map.GenericMap,
+    corners: list[float, float, float, float] | None = None
+) -> sunpy.map.GenericMap:
+    '''Create a submap of the provided map object.
     If corners are not provided, then they will
     be defined to fit the data in the map using
     find_min_max().
 
     Parameters
     ----------
-    map_obj : Sunpy map
+    map_ : Sunpy map
         The input map to be submapped.
     corners : list
         A list containing the corners of the map in units of
         arcseconds: [x_min, y_min, x_max, y_max].
 
     Returns
-    A Sunpy map that is a submap of map_obj defined around corners.
-    """
-
+    A Sunpy map that is a submap of map_ defined around corners.
+    '''
     if corners is None:
-        corners = find_min_max(map_obj.data)
+        corners = find_min_max(map_.data)
+    bl = SkyCoord(
+        corners[0], corners[1], unit=u.arcsec, frame=map_.coordinate_frame)
+    tr = SkyCoord(
+        corners[2], corners[3], unit=u.arcsec, frame=map_.coordinate_frame)
 
-    bl = SkyCoord(corners[0], corners[1], unit=u.arcsec,
-                  frame=map_obj.coordinate_frame)
-    tr = SkyCoord(corners[2], corners[3], unit=u.arcsec,
-                  frame=map_obj.coordinate_frame)
-
-    return map_obj.submap(bottom_left=bl, top_right=tr)
+    return map_.submap(bottom_left=bl, top_right=tr)
 
 
-def set_ticks(ax, b_hide_axes=False):
-    """
-    Configure the ticks on the provided axes.
+def set_ticks(ax: plt.Axes, hide_axes: bool = False):
+    '''Configure the ticks on the provided axes.
 
     Parameters
     ----------
     ax : matplotlib axes
         The axes to configure.
-    b_hide_axes : bool
+    hide_axes : bool
         Specifies whether to show or hide the axes.
-    """
-
+    '''
     lon = ax.coords[0]
     lat = ax.coords[1]
 
@@ -436,7 +438,7 @@ def set_ticks(ax, b_hide_axes=False):
     lon.grid(color='grey', alpha=0.5, linestyle='solid')
     lat.grid(color='grey', alpha=0.5, linestyle='solid')
 
-    if b_hide_axes:
+    if hide_axes:
         lon.set_axislabel('')
         lat.set_axislabel('')
         lon.set_ticks_visible(False)
@@ -445,11 +447,8 @@ def set_ticks(ax, b_hide_axes=False):
         lat.set_ticklabel_visible(False)
 
 
-def add_overlay(ax):
-    """
-    Manually plots the heliographic overlay on the provided axes.
-    """
-
+def add_overlay(ax: plt.Axes):
+    '''Manually plots the heliographic overlay on the provided axes.'''
     overlay = ax.get_coords_overlay('heliographic_stonyhurst')
     lon = overlay[0]
     lat = overlay[1]
@@ -463,10 +462,11 @@ def add_overlay(ax):
 
 
 # TODO: Add map figsize parameter?
-def apply_map_settings(nustar_map, bin_size=1, corners=[],
-                       blur_size=1, b_blur=False, b_contours=False, b_colorbar=True,
-                       b_hide_axes=False, fig=None, index=111, **cb_kwargs):
-    """
+def apply_map_settings(
+        nustar_map, bin_size=1, corners=[],
+        blur_size=1, b_blur=False, b_contours=False, b_colorbar=True,
+        hide_axes=False, fig=None, index=111, **cb_kwargs):
+    '''
     Applies the map settings that are specified in the configuration.
 
     Parameters
@@ -487,7 +487,7 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
         Specifies whether to add contour lines.
     b_colorbar : bool
         Specifies whether to add a colorbar.
-    b_hide_axes : bool
+    hide_axes : bool
         Specifies whether the show or hide the axes.
     cb_kwargs : dict
         Keywords for the colorbar creation.
@@ -502,11 +502,12 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
         Axes object for the plot.
     corners_list : list
         List of the limits used for the axes.
-    """
+    '''
 
     default_kwargs = {
         'cmap': 'plasma',
-        'norm': mplcolors.LogNorm(np.min(nustar_map.data[nustar_map.data != 0]), np.max(nustar_map.data)),
+        'norm': mplcolors.LogNorm(
+            np.min(nustar_map.data[nustar_map.data != 0]), np.max(nustar_map.data)),
         'label': nustar_map.meta['pixlunit']
     }
     cb_kwargs = {**default_kwargs, **cb_kwargs}
@@ -520,10 +521,10 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
         corners = find_min_max(nustar_map.data, bin_size)
 
     x_min, y_min, x_max, y_max = corners
-    bl = SkyCoord(x_min*u.arcsec, y_min*u.arcsec,
-                  frame=nustar_map.coordinate_frame)
-    tr = SkyCoord(x_max*u.arcsec, y_max*u.arcsec,
-                  frame=nustar_map.coordinate_frame)
+    bl = SkyCoord(
+        x_min*u.arcsec, y_min*u.arcsec, frame=nustar_map.coordinate_frame)
+    tr = SkyCoord(
+        x_max*u.arcsec, y_max*u.arcsec, frame=nustar_map.coordinate_frame)
     nustar_submap = nustar_map.submap(bottom_left=bl, top_right=tr)
 
     # Create the figure with the applied settings
@@ -543,7 +544,7 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
     # Draw the solar limb
     # nustar_submap.draw_limb(color='black', linewidth=1.25, linestyle='dotted', zorder=0)
 
-    set_ticks(ax, b_hide_axes)
+    set_ticks(ax, hide_axes)
     add_overlay(ax)
 
     # Tweak the title
@@ -556,9 +557,13 @@ def apply_map_settings(nustar_map, bin_size=1, corners=[],
     return nustar_submap, fig, ax, corners
 
 
-def get_region_data(reg, data, fill_val=0, b_full_size=False):
-    """
-    Get the data contained within the provided region.
+def get_region_data(
+    reg: PixelRegion,
+    data: np.ndarray,
+    fill_val: float = 0,
+    full_size: bool = False
+) -> np.ndarray:
+    '''Get the data contained within the provided region.
 
     Parameters
     ----------
@@ -569,7 +574,7 @@ def get_region_data(reg, data, fill_val=0, b_full_size=False):
         e.g. from a Sunpy map.
     fill_val : float
         The default null value in indices outside the region.
-    b_full_size : bool
+    full_size : bool
         Specifies whether the returned array, reg_data,
         is the same shape as the input array, data.
         The default is False since it is wasteful in memory.
@@ -579,26 +584,26 @@ def get_region_data(reg, data, fill_val=0, b_full_size=False):
     reg_data : np.ndarray
         An array containing only the pixel information within
         the provided reg.
-    """
-
+    '''
     reg_mask = reg.to_mask()
     xmin, xmax = reg_mask.bbox.ixmin, reg_mask.bbox.ixmax
     ymin, ymax = reg_mask.bbox.iymin, reg_mask.bbox.iymax
-    reg_data = np.where(reg_mask.data == 1,
-                        data[ymin:ymax, xmin:xmax], fill_val)
-
-    if b_full_size:
-        a = np.full(shape=data.shape, fill_value=fill_val,
-                    dtype=reg_data.dtype)
+    reg_data = np.where(
+        reg_mask.data == 1, data[ymin:ymax, xmin:xmax], fill_val)
+    if full_size:
+        a = np.full(
+            shape=data.shape, fill_value=fill_val, dtype=reg_data.dtype)
         a[ymin:ymax, xmin:xmax] = reg_data
         reg_data = a
 
     return reg_data
 
 
-def find_dets_in_region(det_map, region):
-    """
-    Determines which detectors appear within the given region.
+def find_dets_in_region(
+    det_map: sunpy.map.GenericMap,
+    region: CirclePixelRegion
+) -> list[int]:
+    '''Determines which detectors appear within the given region.
 
     Parameters
     ----------
@@ -611,8 +616,7 @@ def find_dets_in_region(det_map, region):
     -------
     dets : list
         A list containing the dets that are within the region.
-    """
-
+    '''
     det_data = get_region_data(region, det_map.data, fill_val=-1)
     dets = list(np.unique(det_data))
     dets.sort()
@@ -620,10 +624,17 @@ def find_dets_in_region(det_map, region):
     return dets
 
 
-def twoD_Gaussian(xdata_tuple, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
-    """
-    Function for a 2D Gaussian.
-    """
+def twoD_Gaussian(
+    xdata_tuple: tuple,
+    amplitude: float,
+    xo: float,
+    yo: float,
+    sigma_x: float,
+    sigma_y: float,
+    theta: float,
+    offset: float
+):
+    '''Function for a 2D Gaussian.'''
 
     (x, y) = xdata_tuple
     xo = float(xo)
@@ -633,17 +644,23 @@ def twoD_Gaussian(xdata_tuple, amplitude, xo, yo, sigma_x, sigma_y, theta, offse
     c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
     g = offset + amplitude*np.exp(- (a*((x-xo)**2) + 2*b*(x-xo)*(y-yo)
                                      + c*((y-yo)**2)))
+
     return g.ravel()
 
 
-def fit_gaussian(map_obj, ax, num_contours=6):
-    """
-    Fits a 2D Gaussian to the data contained in map_obj.
+def fit_gaussian(
+    map_: sunpy.map.GenericMap,
+    ax: plt.Axes,
+    num_contours: int = 6
+):
+    '''Fits a 2D Gaussian to the data contained in map_.
     Plots the results as contour lines.
+
+    Fitting method from https://stackoverflow.com/a/21566831
 
     Parameters
     ----------
-    map_obj : Sunpy map
+    map_ : Sunpy map
         The map containing the data that the Gaussian will be fit to.
     ax : matplotlib axes
         The axes corresponding to map_opj.
@@ -653,10 +670,8 @@ def fit_gaussian(map_obj, ax, num_contours=6):
     Returns
     -------
     None
-    """
-
-    # Fitting method: https://stackoverflow.com/a/21566831
-    data = map_obj.data
+    '''
+    data = map_.data
     data = np.hstack((data, np.zeros((data.shape[0], 1))))
     x = np.linspace(0, data.shape[1], data.shape[1])
     y = np.linspace(0, data.shape[0], data.shape[0])
@@ -672,22 +687,22 @@ def fit_gaussian(map_obj, ax, num_contours=6):
     ratio = popt[3]/popt[4]
     text(0.5, 0.95, r'$\sigma$ ratio: {ratio:0.3f}, {1/ratio:0.3f}',
          fontsize=12, color='white', va='center', transform=ax.transAxes)
-
     ax.contour(x, y, data_fitted.reshape(data.shape), num_contours,
                colors='blue', alpha=0.2)
 
 
-def compute_distance(x1, y1, x2, y2):
-    """
-    Computes the distance between two coordinates.
-    """
-
+def compute_distance(x1: float, y1: float, x2: float, y2: float) -> float:
+    '''Computes the distance between two coordinates.'''
     return np.sqrt((x1-x2)**2 + (y1-y2)**2)
 
 
-def compute_farthest_pixel(arr, ref_x, ref_y):
-    """
-    Find the farthest pixel from (ref_x, ref_y) that has nonzero data in the input array.
+def compute_farthest_pixel(
+    arr: np.ndarray,
+    ref_x: int,
+    ref_y: int
+) -> tuple[int, int, float]:
+    '''Find the farthest pixel from (ref_x, ref_y) that has
+    nonzero data in the input array.
 
     Parameters
     ----------
@@ -706,8 +721,7 @@ def compute_farthest_pixel(arr, ref_x, ref_y):
         The y-coordinate of the farthest pixel.
     far_dist : float
         The distance between the reference pixel and the farthest pixel.
-    """
-
+    '''
     num_rows, num_cols = arr.shape
     far_x, far_y = -1, -1
     far_dist = 0
@@ -722,9 +736,14 @@ def compute_farthest_pixel(arr, ref_x, ref_y):
     return far_x, far_y, far_dist
 
 
-def plot_point(x, y, ax, radius=2, **kwargs):
-    """
-    Plots a point on the axis at the specified pixel point.
+def plot_point(
+    x: float,
+    y: float,
+    ax: plt.Axes,
+    radius: float = 2,
+    **kwargs
+) -> CirclePixelRegion:
+    '''Plots a point on the axis at the specified pixel point.
 
     Parameters
     ----------
@@ -741,26 +760,32 @@ def plot_point(x, y, ax, radius=2, **kwargs):
     -------
     point : CirclePixelRegion
         The astropy regions circle object representing the point.
-    """
-
+    '''
     default_kwargs = {'facecolor': 'blue', 'edgecolor': 'blue', 'lw': 2}
     kwargs = {**default_kwargs, **kwargs}
     kwargs['facecolor'] = kwargs['edgecolor']
     kwargs['fill'] = True  # Force True, otherwise it's just a circle
-
     point = CirclePixelRegion(PixCoord(x, y), radius=radius)
     point.plot(ax=ax, **kwargs)
 
     return point
 
 
-def plot_rectangle(map_obj, ax, center_x, center_y, width, height, angle, **kwargs):
-    """
-    Plot a rectangle on the provided map.
+def plot_rectangle(
+    map_: sunpy.map.GenericMap,
+    ax: plt.Axes,
+    center_x: float,
+    center_y: float,
+    width: float,
+    height: float,
+    angle: float,
+    **kwargs
+) -> RectangleSkyRegion:
+    '''Plot a rectangle on the provided map.
 
     Parameters
     ----------
-    map_obj : Sunpy map
+    map_ : Sunpy map
         The map on which the rectangle will be drawn.
     ax : matplotlib axes object
         The associated axes object.
@@ -780,22 +805,20 @@ def plot_rectangle(map_obj, ax, center_x, center_y, width, height, angle, **kwar
     -------
     rect : RectangleSkyRegion
         The astropy regions rectangle object.
-    """
-
+    '''
     rect = RectangleSkyRegion(
-        center=SkyCoord(center_x, center_y, unit='arcsec',
-                        frame=map_obj.coordinate_frame),
-        width=width*u.arcsec, height=height*u.arcsec,
-        angle=angle*u.deg
+        center=SkyCoord(
+            center_x, center_y, unit='arcsec', frame=map_.coordinate_frame),
+        width=width * u.arcsec, height=height * u.arcsec,
+        angle=angle * u.deg
     )
-    rect.to_pixel(map_obj.wcs).plot(ax=ax, **kwargs)
+    rect.to_pixel(map_.wcs).plot(ax=ax, **kwargs)
 
     return rect
 
 
-def get_data_coords(arr):
-    """
-    Obtain the coordinates of all nonzero data points in the provided data.
+def get_data_coords(arr: np.ndarray) -> np.ndarray:
+    '''Obtain the coordinates of all nonzero data points in the provided data.
 
     Parameters
     ----------
@@ -806,36 +829,37 @@ def get_data_coords(arr):
     -------
     nonzero_points : np.ndarray
         An array where each element is a coordinate (x, y)
-    """
-
+    '''
     nonzero_y, nonzero_x = np.nonzero(arr)
     nonzero_points = np.vstack((nonzero_x, nonzero_y)).T
 
     return nonzero_points
 
 
-def make_sunpy_header(evt_data, hdr, exp_time=0, on_time=0, rebin_size=1.0, norm_map=True):
-    """
-    Make the header for a fits file.
-    """
-
+def make_sunpy_header(
+    evt_data: fits.FITS_rec,
+    hdr: fits.Header,
+    exp_time: float = 0,
+    on_time: float = 0,
+    rebin_size: float = 1.0,
+    norm_map: bool = True
+):
+    '''Make the header for a fits file.'''
     for field in list(hdr.keys()):
         if field.find('TYPE') != -1:
             if hdr[field] == 'X':
                 xval = field[5:8]
             if hdr[field] == 'Y':
                 yval = field[5:8]
-
-    min_x = hdr['TLMIN'+xval]
-    min_y = hdr['TLMIN'+yval]
-    max_x = hdr['TLMAX'+xval]
-    max_y = hdr['TLMAX'+yval]
-    delx = abs(hdr['TCDLT'+xval])
-    dely = abs(hdr['TCDLT'+yval])
+    min_x = hdr[f'TLMIN{xval}']
+    min_y = hdr[f'TLMIN{yval}']
+    max_x = hdr[f'TLMAX{xval}']
+    max_y = hdr[f'TLMAX{yval}']
+    delx = abs(hdr[f'TCDLT{xval}'])
+    dely = abs(hdr[f'TCDLT{yval}'])
 
     met = evt_data['TIME'][:]*u.s
     mjdref = hdr['MJDREFI']
-
     mid_obs_time = astropy.time.Time(mjdref*u.d+met.mean(), format='mjd')
     sta_obs_time = astropy.time.Time(mjdref*u.d+met.min(), format='mjd')
 
@@ -845,21 +869,13 @@ def make_sunpy_header(evt_data, hdr, exp_time=0, on_time=0, rebin_size=1.0, norm
     if (on_time == 0):
         on_time = hdr['ONTIME']
 
-    delx = u.Quantity(delx, hdr['TCUNI14']).to(u.arcsec).value
-    # multiplier = 1
-    # if delx == 0.0006828076:
-    #     multiplier = 3600
-
     # Assume X and Y are the same size
+    delx = u.Quantity(delx, hdr['TCUNI14']).to(u.arcsec).value
     scale = delx * rebin_size
     bins = (max_x - min_x) / (rebin_size)
 
     # Normalise the data with the exposure (or live) time?
-    if norm_map:
-        pixluname = 'DN/s'
-    else:
-        pixluname = 'DN'
-
+    pixluname = 'DN/s' if norm_map else 'DN'
     dict_header = {
         "DATE-OBS": sta_obs_time.iso,
         "EXPTIME": exp_time,
@@ -884,15 +900,13 @@ def make_sunpy_header(evt_data, hdr, exp_time=0, on_time=0, rebin_size=1.0, norm
         "RSUN_REF": sunpy.sun.constants.radius.value,
         "DSUN_OBS": sunpy.coordinates.sun.earth_distance(mid_obs_time).to_value('m')
     }
-
     header = sunpy.util.MetaDict(dict_header)
 
     return header
 
 
-def apply_counts_threshold(data_array, threshold):
-    """
-    Change all values below the given threshold in the provided data array to zero.
+def apply_counts_threshold(data_array: np.ndarray, threshold: float) -> np.ndarray:
+    '''Change all values below the given threshold in the provided data array to zero.
     This is essentially a counts filter.
 
     Parameters
@@ -906,23 +920,24 @@ def apply_counts_threshold(data_array, threshold):
     -------
     data_array : np array
         Data array with the threshold applied.
-    """
-
-    # https://stackoverflow.com/questions/28430904/set-numpy-array-elements-to-zero-if-they-are-above-a-specific-threshold
+    '''
     sub_threshold_indices = data_array < threshold
     data_array[sub_threshold_indices] = 0
 
     return data_array
 
 
-def get_subregion(map_obj, center, radius):
-    """
-    Obtain the bottom left and top right coordinates of the subregion
+def get_subregion(
+    map_: sunpy.map.GenericMap,
+    center: float,
+    radius: float
+) -> tuple[SkyCoord, SkyCoord]:
+    '''Obtain the bottom left and top right coordinates of the subregion
     specified by the provided coordinates.
 
     Parameters
     ----------
-    map_obj : Sunpy map
+    map_ : Sunpy map
         The input map that the region is based on.
     center : tuple
         Coordinates for the region center, (x,y), in arcseconds.
@@ -935,22 +950,20 @@ def get_subregion(map_obj, center, radius):
         The bottom left point of the subregion.
     tr : SkyCoord
         The top right point of the subregion.
-    """
-
+    '''
     x, y = center
     bl_x, bl_y = x - radius, y - radius
-    bl = SkyCoord(bl_x*u.arcsecond, bl_y*u.arcsecond,
-                  frame=map_obj.coordinate_frame)
-
+    bl = SkyCoord(
+        bl_x*u.arcsecond, bl_y*u.arcsecond, frame=map_.coordinate_frame)
     tr_x, tr_y = x + radius, y + radius
-    tr = SkyCoord(tr_x*u.arcsecond, tr_y*u.arcsecond,
-                  frame=map_obj.coordinate_frame)
+    tr = SkyCoord(
+        tr_x*u.arcsecond, tr_y*u.arcsecond, frame=map_.coordinate_frame)
 
     return bl, tr
 
 
 def get_sky_from_arcseconds(time, solar_pos, **kwargs):
-    """
+    '''
     This is the inverse of nustar_pysolar.convert._delta_solar_skyfield().
     Convert arcsecond coordinates to sky coordinates.
 
@@ -971,7 +984,7 @@ def get_sky_from_arcseconds(time, solar_pos, **kwargs):
     -------
     sky_pos : astropy Quantity
         The converted coordinate in units of degrees.
-    """
+    '''
 
     from nustar_pysolar.utils import skyfield_ephem
     from sunpy.coordinates import sun
@@ -980,22 +993,20 @@ def get_sky_from_arcseconds(time, solar_pos, **kwargs):
     tStep = tStep * u.s
 
     load_path = kwargs.get('load_path', None)
-    observer, TheSun, ts = skyfield_ephem(load_path=load_path,
-                                          parallax_correction=True,
-                                          utc=time)
+    observer, TheSun, ts = skyfield_ephem(
+        load_path=load_path, parallax_correction=True, utc=time)
     tcheck = ts.from_astropy(time)
     astrometric = observer.at(tcheck).observe(TheSun)
     this_ra, this_dec, dist = astrometric.radec()
 
     # Get the center of the Sun, and assign it degrees.
     # Doing it this was is necessary to do the vector math below.
-    sun_pos = np.array([this_ra.to(u.deg).value,
-                        this_dec.to(u.deg).value])*u.deg
+    sun_pos = np.array(
+        [this_ra.to(u.deg).value, this_dec.to(u.deg).value])*u.deg
     sun_np = sun.P(time)
-
-    rotMatrix = np.array([[np.cos(sun_np), np.sin(sun_np)],
-                          [-np.sin(sun_np),  np.cos(sun_np)]])
-
+    rotMatrix = np.array([
+        [np.cos(sun_np), np.sin(sun_np)],
+        [-np.sin(sun_np),  np.cos(sun_np)]])
     delta_offset = solar_pos*[-1., 1.]
     offset = ((np.dot(delta_offset, np.linalg.inv(rotMatrix))).to(u.deg))
     sky_pos = offset + sun_pos
@@ -1004,10 +1015,7 @@ def get_sky_from_arcseconds(time, solar_pos, **kwargs):
 
 
 def get_arcsecond_coordinates(region: CircleSkyRegion) -> tuple[float, float, float]:
-    """
-    Returns the x, y, radius coordinates of the circle.
-    """
-
+    '''Returns the x, y, radius coordinates of the circle.'''
     x = region.center.Tx.arcsec
     y = region.center.Ty.arcsec
     r = region.radius.value
@@ -1015,46 +1023,57 @@ def get_arcsecond_coordinates(region: CircleSkyRegion) -> tuple[float, float, fl
     return x, y, r
 
 
-def pixcoord_map_transform(map1, map2, x, y, map_pixcoord=None):
-    """
-    Convert a PixCoord from one map frame to another.
+def pixcoord_map_transform(
+    map1: sunpy.map.GenericMap,
+    map2: sunpy.map.GenericMap,
+    x: float,
+    y: float,
+    map_pixcoord: PixCoord | None = None
+) -> PixCoord:
+    '''Convert a PixCoord from one map frame to another.
 
     Parameters
     ----------
-    map_obj : sunpy map
+    map1 : sunpy map
         The original map that contains the provided (x,y) coordinate.
-    submap : sunpy map
+    map2 : sunpy map
         The map to which the provided (x,y) coordinate will be converted to.
     x : float
         The x-coordinate in pixels.
     y : float
         The y-coordinate in pixels.
     map_pixcoord : regions.PixCoord object
-        A PixCoord of the pixel coordinate in the map_obj frame.
+        A PixCoord of the pixel coordinate in the map1 frame.
 
     Returns
     -------
     submap_pixcoord : regions.PixCoord object
-        A PixCoord of the pixel coordinate in the submap frame.
-    """
-
+        A PixCoord of the pixel coordinate in the map2 frame.
+    '''
     if map_pixcoord is None:
         map_pixcoord = PixCoord(x, y)
-
     map_skycoord = map_pixcoord.to_sky(map1.wcs)
     submap_pixcoord = PixCoord.from_sky(map_skycoord, map2.wcs)
 
     return submap_pixcoord
 
 
-def draw_circle(map_obj, submap, axes, center_x, center_y, radius, b_plot_center=True, **kwargs):
-    """
-    Plot a circle on the provided axes. The provided center coordinates are converted
-    from map_obj pixels to submap pixels.
+def draw_circle(
+    map1: sunpy.map.GenericMap,
+    map2: sunpy.map.GenericMap,
+    axes: plt.Axes,
+    center_x: float,
+    center_y: float,
+    radius: float,
+    plot_center: bool = True,
+    **kwargs
+) -> CirclePixelRegion:
+    '''Plot a circle on the provided axes. The provided center coordinates are converted
+    from map1 pixels to submap pixels.
 
     Parameters
     ----------
-    map_obj : Sunpy map
+    map1 : Sunpy map
         The map that the center_x and center_y coordinates are from.
     submap : Sunpy map
         The map on which the circle will be drawn.
@@ -1066,38 +1085,39 @@ def draw_circle(map_obj, submap, axes, center_x, center_y, radius, b_plot_center
         The y-coordinate of the circle center.
     radius : float
         The radius of the circle in pixels.
-    b_plot_center : bool
+    plot_center : bool
         Speicfy whether to plot the center point of the circle.
     kwargs
         Keyword arguments for the cosmetic features of the circle.
 
     Returns
     -------
-    reg : PixelCircleRegion
+    reg : CirclePixelRegion
         The circle region that was plotted.
-    """
-
+    '''
     submap_center_pix = pixcoord_map_transform(
-        map_obj, submap, center_x, center_y)
+        map1, map2, center_x, center_y)
     reg = CirclePixelRegion(submap_center_pix, radius=radius)
     patch = reg.as_artist(**kwargs)
     axes.add_patch(patch)
-
-    if b_plot_center:
-        reg_center = plot_point(*submap_center_pix.xy, axes, 0.05, **kwargs)
+    if plot_center:
+        _ = plot_point(*submap_center_pix.xy, axes, 0.05, **kwargs)
 
     return reg
 
 
-def plot_nominal_coordinate(evt_file, submap, axes, time=None):
-
+def plot_nominal_coordinate(
+    evt_file: str,
+    map_: sunpy.map.GenericMap,
+    axes: plt.Axes,
+    time: Time | None = None
+) -> CirclePixelRegion:
+    '''Plots the nominal coordinate on the provided map.'''
     x, y = utilities.get_nominal_coordinate(evt_file, time)
-
-    center_pix = submap.wcs.world_to_pixel(
-        SkyCoord(*(x, y), frame=submap.coordinate_frame))
+    center_pix = map_.wcs.world_to_pixel(
+        SkyCoord(*(x, y), frame=map_.coordinate_frame))
     # For some reason, each coordinate is contained in an array
     center_pix = [float(c) for c in center_pix]
-
     point = plot_point(*center_pix, axes, 0.1, color='brown')
 
     return point

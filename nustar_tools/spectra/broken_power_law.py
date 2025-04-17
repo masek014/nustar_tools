@@ -1,6 +1,8 @@
-import astropy.units as u
 import functools
+
+import astropy.units as u
 import numpy as np
+
 
 PHOTON_RATE_UNIT = u.ph / u.keV / u.cm**2 / u.s
 
@@ -13,7 +15,7 @@ def simulate_nonthermal_spectrum(
     lower_index: u.Quantity | float,
     upper_index: u.Quantity | float,
 ) -> tuple[u.Quantity, u.Quantity]:
-
+    '''Simulate a nonthermal spectrum given the parameters.'''
     source_spectrum = compute_broken_power_law(
         energy_edges,
         1 * u.keV,
@@ -38,6 +40,8 @@ def _compute_broken_power_law_normalizations(
     '''(internal)
     give the correct upper and lower power law normalizations given the
     desired flux and locations of break & norm energies
+
+    # TODO: link the gist from which this came.
     '''
     energy_arg = (break_energy / reference_energy).to(u.one)
     if reference_energy < break_energy:
@@ -56,7 +60,7 @@ def integrate_power_law(
     norm: PHOTON_RATE_UNIT,
     index: u.one
 ) -> (PHOTON_RATE_UNIT * u.keV):
-    r"""Evaluate the antiderivative of a power law at a given energy or vector of energies.
+    r'''Evaluate the antiderivative of a power law at a given energy or vector of energies.
 
     The power law antiderivative evaluated by this function is assumed to take the following form,
     :math:`f(E) = N \left( \frac{E}{E_0} \right)^{- \gamma}`,
@@ -83,7 +87,7 @@ def integrate_power_law(
     -------
     `astropy.units.Quantity`
         Analytical antiderivative of a power law evaluated at the given energies.
-    """
+    '''
     prefactor = norm * norm_energy
     arg = (energy / norm_energy).to(u.one)
     if index == 1:
@@ -100,7 +104,7 @@ def compute_broken_power_law(
     lower_index: u.one,
     upper_index: u.one
 ) -> PHOTON_RATE_UNIT:
-    r"""Analytically evaluate a photon-space broken power law and bin the flux.
+    r'''Analytically evaluate a photon-space broken power law and bin the flux.
 
     The broken power law is assumed to take the following form,
 
@@ -140,7 +144,7 @@ def compute_broken_power_law(
     `astropy.units.Quantity`
         Photon broken power law, where the flux in each energy bin is equal
         to the broken power law analytically averaged over each bin.
-    """
+    '''
 
     if energy_edges.size <= 1:
         raise ValueError('Need at least two energy edges.')

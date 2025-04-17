@@ -1,13 +1,17 @@
-import numpy as np
+import datetime
+import math
+
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import scipy.special
+
 from scipy.stats import skewnorm
+
+from ..utils import time_tools, utilities
 
 import warnings
 warnings.simplefilter('ignore')
-
-from ..utils import utilities
 
 
 STYLES_DIR = f'{utilities.os.path.dirname(utilities.os.path.realpath(__file__))}/styles/'
@@ -21,7 +25,7 @@ def apply_colorbar(fig, ax, **kwargs):
     """
     Use the apply_colorbar method from mapping.tools.
     """
-    
+
     from ..mapping.tools import apply_colorbar
     apply_colorbar(fig, ax, **kwargs)
 
@@ -69,8 +73,8 @@ def get_frame_limits(evt_data, frame_length):
     """
 
     x_min, x_max, _ = utilities.characterize_frames(evt_data, frame_length)
-    x_min = utilities.convert_nustar_time_to_datetime(x_min)
-    x_max = utilities.convert_nustar_time_to_datetime(x_max)
+    x_min = time_tools.nustar_to_datetime(x_min)
+    x_max = time_tools.nustar_to_datetime(x_max)
 
     return x_min, x_max
 
@@ -97,15 +101,15 @@ def choose_tick_interval(x_min, x_max, b_datetime=True):
 
     time_diff = 0
     if b_datetime:
-        time_diff = (x_max - x_min).total_seconds() # Total time in seconds
+        time_diff = (x_max - x_min).total_seconds()  # Total time in seconds
     else:
         time_diff = x_max - x_min
 
-    minutes = divmod(time_diff, 60)[0] + 1 # Add one to round up
+    minutes = divmod(time_diff, 60)[0] + 1  # Add one to round up
     time_list = [0.2, 1, 2, 5, 10, 30]
     time_interval = 0
     for t in time_list:
-        if minutes / t >= 3: # Ensures at least 3 major tick marks
+        if minutes / t >= 3:  # Ensures at least 3 major tick marks
             time_interval = t
         else:
             break
@@ -136,13 +140,16 @@ def set_x_ticks(ax, x_min=None, x_max=None, b_minor_ticks=True):
 
     if x_min is None and x_max is None:
         x_min, x_max = ax.get_xlim()
-        x_min = utilities.datetime.fromtimestamp(x_min*24*60*60, tz=utilities.timezone.utc)
-        x_max = utilities.datetime.fromtimestamp(x_max*24*60*60, tz=utilities.timezone.utc)
+        x_min = datetime.datetime.fromtimestamp(
+            x_min*24*60*60, tz=datetime.timezone.utc)
+        x_max = datetime.datetime.fromtimestamp(
+            x_max*24*60*60, tz=datetime.timezone.utc)
 
     chosen_time = choose_tick_interval(x_min, x_max)
 
     # Set up the major ticks
-    xlocator = matplotlib.dates.MinuteLocator(byminute=np.arange(0, 60, chosen_time))
+    xlocator = matplotlib.dates.MinuteLocator(
+        byminute=np.arange(0, 60, chosen_time))
     ax.xaxis.set_major_locator(xlocator)
     formatter = matplotlib.dates.DateFormatter('%H:%M')
     ax.xaxis.set_major_formatter(formatter)
@@ -155,7 +162,8 @@ def set_x_ticks(ax, x_min=None, x_max=None, b_minor_ticks=True):
             for i in range(2, 11):
                 if chosen_time % i == 0:
                     x_locator_number = i
-        ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(x_locator_number))
+        ax.xaxis.set_minor_locator(
+            matplotlib.ticker.AutoMinorLocator(x_locator_number))
 
 
 def set_y_ticks(ax, b_minor_ticks=True):
@@ -186,7 +194,7 @@ def find_zeros(data):
     ----------
     data : np.array
         The input data for which the zeros will be found.
-    
+
     Returns
     -------
     zero_indices : np.array
@@ -205,7 +213,7 @@ def find_zeros(data):
     return np.array(zero_indices)
 
 
-def add_smoothed_curve(ax, line, smoothing_width=None, **kwargs):
+def add_smoothed_curve(ax, line, smoothing_width: int, **kwargs):
     """
     Adds a smoothed version of the given line to the provided axes
     using a moving average.
@@ -230,8 +238,6 @@ def add_smoothed_curve(ax, line, smoothing_width=None, **kwargs):
     default_kwargs = {'color': 'black', 'linestyle': 'dashed', 'linewidth': 1}
     kwargs = {**default_kwargs, **kwargs}
 
-    if smoothing_width is None:
-        smoothing_width = int(utilities.get_config_option('LightcurveSettings', 'SMOOTHING_WIDTH'))
     x, y = line.get_xdata(), line.get_ydata()
     smoothed_y = utilities.moving_average(y, smoothing_width)
     smoothed_line = ax.plot(x, smoothed_y, **kwargs)[0]
@@ -288,9 +294,9 @@ def plot_derivative(ax, line, b_add_derivative=True, b_add_smoothed=False, b_add
         s_alpha = 0.6
 
     derivative_line = ax2.plot(dt_times[:-1], dydx,
-        color='violet', alpha=d_alpha, label='Derivative')[0]
+                               color='violet', alpha=d_alpha, label='Derivative')[0]
     smoothed_derivative_line = add_smoothed_curve(ax2, derivative_line,
-            color='purple', alpha=s_alpha, label='Smoothed derivative')
+                                                  color='purple', alpha=s_alpha, label='Smoothed derivative')
 
     if b_add_derivative:
         lines.append(derivative_line)
@@ -301,16 +307,16 @@ def plot_derivative(ax, line, b_add_derivative=True, b_add_smoothed=False, b_add
         lines.append(smoothed_derivative_line)
         ax2.set_ylabel('Derivative (Counts s${}^{-2}$)')
         ax2.axhline(0, color='darkred', linewidth=0.5, linestyle='dashed')
-    
+
     if b_add_zeros:
         smoothed_dydx = smoothed_derivative_line.get_ydata()
         zero_indices = find_zeros(smoothed_dydx)
-        zero_times = (dt_times[zero_indices+1] - \
+        zero_times = (dt_times[zero_indices+1] -
                       dt_times[zero_indices])/2 + \
-                      dt_times[zero_indices]
+            dt_times[zero_indices]
 
         zeros_line = ax.plot(zero_times, values[zero_indices],
-            'rx', markersize=8, mew=2, label='Derivative zeros')[0]
+                             'rx', markersize=8, mew=2, label='Derivative zeros')[0]
         lines.append(zeros_line)
 
     return lines
@@ -346,40 +352,43 @@ def add_skewnorm(time_edges, ax, amp, a, loc, scale, background=None):
         The axes on which the plot was made.
     """
     '''
-    x_min = utilities.convert_nustar_time_to_datetime(time_edges[0])
-    x_max = utilities.convert_nustar_time_to_datetime(time_edges[-1])
+    x_min = time_tools.nustar_to_datetime(time_edges[0])
+    x_max = time_tools.nustar_to_datetime(time_edges[-1])
     '''
 
     x = np.linspace(time_edges[0], time_edges[-1], 2000)
-    plotx = [utilities.convert_nustar_time_to_datetime(i) for i in x]
+    plotx = [time_tools.nustar_to_datetime(i) for i in x]
     fit = skewnorm(a, loc=loc, scale=scale)
     ploty = fit.pdf(x) * amp
-    
-    if background is None: #Case of using count rates
+
+    if background is None:  # Case of using count rates
         ax.plot(plotx, ploty, color='red', ls='-', lw=1.5, label='Fit Curve')
-    else: #Case of using residual rates
+    else:  # Case of using residual rates
         plot_bkgd = np.zeros(shape=np.shape(x))
-        for index in range(len(plotx)): #Iterate through all of the plotting indices
-            for i in range(len(time_edges) - 1): #Check all of the time_edges to find correct background bin
+        for index in range(len(plotx)):  # Iterate through all of the plotting indices
+            # Check all of the time_edges to find correct background bin
+            for i in range(len(time_edges) - 1):
                 if (x[index] >= time_edges[i]) & (x[index] <= time_edges[i+1]):
-                    #Set plotting background to correct bin of background and move to next plotting index
+                    # Set plotting background to correct bin of background and move to next plotting index
                     plot_bkgd[index] = background[i]
                     break
-        
-        #Plot residual fit + background rates
-        ax.plot(plotx, ploty + plot_bkgd, color='orange', ls='-', lw=1.5, label='Fit Curve + Background')
+
+        # Plot residual fit + background rates
+        ax.plot(plotx, ploty + plot_bkgd, color='orange',
+                ls='-', lw=1.5, label='Fit Curve + Background')
 
     return ax
 
+
 def skewed_gaussian(x, A, mu, sigma, gamma):
 
-    y = A / (sigma*utilities.math.sqrt(2*utilities.math.pi)) * \
+    y = A / (sigma*math.sqrt(2*math.pi)) * \
         np.exp(-(x-mu)**2/(2*sigma**2)) * \
-            ( 1 + scipy.special.erf(gamma*(x-mu) / (sigma*utilities.math.sqrt(2))) )
+            (1 + scipy.special.erf(gamma*(x-mu) / (sigma*math.sqrt(2))))
 
     return y
 
 
 def skewnorm_pdf(x, a, loc, scale):
-    #Used for scipy.optimize's curve_fit
+    # Used for scipy.optimize's curve_fit
     return skewnorm.pdf(x, a, loc=loc, scale=scale)

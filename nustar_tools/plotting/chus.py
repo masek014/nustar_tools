@@ -1,14 +1,19 @@
+import astropy.units as u
+import numpy as np
+
+from astropy.io import fits
+from astropy.time import Time
+
 from . import tools as ptools
-np = ptools.np
-utilities = ptools.utilities
-u = utilities.u
+from ..utils import utilities
 
 
 def get_evtfile_from_chufile(chu_file, fpm='A'):
 
     id_dir = utilities.get_id_dir_from_hk_file(chu_file)
     id_num = utilities.get_id_from_id_dir(id_dir)
-    evt_file = utilities.EVT_FILE_PATH_FORMAT.format(id_dir=id_dir, id_num=id_num, fpm=fpm)
+    evt_file = utilities.EVT_FILE_PATH_FORMAT.format(
+        id_dir=id_dir, id_num=id_num, fpm=fpm)
 
     return evt_file
 
@@ -31,14 +36,14 @@ def get_chu_data(data_file):
     """
 
     # Load in the CHU file
-    with utilities.fits.open(data_file) as clist:
+    with fits.open(data_file) as clist:
         cdata1 = clist[1].data
         cdata2 = clist[2].data
         cdata3 = clist[3].data
         chdr = clist[1].header
 
-    mjdref=utilities.Time(chdr['mjdrefi'],format='mjd')
-    ctims=utilities.Time(mjdref+cdata3['time']*u.s,format='mjd')
+    mjdref = Time(chdr['mjdrefi'], format='mjd')
+    ctims = Time(mjdref+cdata3['time']*u.s, format='mjd')
 
     # Convert to format matplotlib can handle
     # So going astropytime -> datetime -> matplotlibdates
@@ -48,22 +53,22 @@ def get_chu_data(data_file):
     # Based on the IDL code ../idl/load_nschu.pro
     # Just assinging 1 if in CHU1, 4 if in CHU2, 9 if in CHU3
     # Also a value of 5=> CHU12, 10 => CHU13, 14 => CHU123 etc.....
-    maxres=20
-    c1mask=np.all([[cdata1['valid'] == 1],[cdata1['residual'] < maxres],\
-                [cdata1['starsfail'] < cdata1['objects']],[cdata1['chuq'][:,3] != 1]],axis=0)
+    maxres = 20
+    c1mask = np.all([[cdata1['valid'] == 1], [cdata1['residual'] < maxres],
+                     [cdata1['starsfail'] < cdata1['objects']], [cdata1['chuq'][:, 3] != 1]], axis=0)
     # These give True or False back so multiplying by number gives number or 0
-    c1mask=c1mask[0]*1
-    c2mask=np.all([[cdata2['valid'] == 1],[cdata2['residual'] < maxres],\
-                [cdata2['starsfail'] < cdata2['objects']],[cdata2['chuq'][:,3] != 1]],axis=0)
-    c2mask=(c2mask[0]*4)
-    c3mask=np.all([[cdata3['valid'] == 1],[cdata3['residual'] < maxres],\
-                [cdata3['starsfail'] < cdata3['objects']],[cdata3['chuq'][:,3] != 1]],axis=0)
-    c3mask=(c3mask[0]*9)
-    mask=c1mask+c2mask+c3mask
+    c1mask = c1mask[0]*1
+    c2mask = np.all([[cdata2['valid'] == 1], [cdata2['residual'] < maxres],
+                     [cdata2['starsfail'] < cdata2['objects']], [cdata2['chuq'][:, 3] != 1]], axis=0)
+    c2mask = (c2mask[0]*4)
+    c3mask = np.all([[cdata3['valid'] == 1], [cdata3['residual'] < maxres],
+                     [cdata3['starsfail'] < cdata3['objects']], [cdata3['chuq'][:, 3] != 1]], axis=0)
+    c3mask = (c3mask[0]*9)
+    mask = c1mask+c2mask+c3mask
 
     # Tweak the mask labelling to make plotting easier
     # Maybe not the best way of doing this....
-    newmask=np.zeros(len(mask))
+    newmask = np.zeros(len(mask))
     newmask[np.where(mask == 1)] = 1
     newmask[np.where(mask == 4)] = 2
     newmask[np.where(mask == 5)] = 3
@@ -76,8 +81,9 @@ def get_chu_data(data_file):
 
 
 # Based on the example at https://github.com/ianan/nustar_sac/blob/master/python/example_hk.ipynb
-def make_chu_plot(hk_file, fig_dir='./', file_name='chu',
-    xlim=None, axes_position=[]):
+def make_chu_plot(
+        hk_file, fig_dir='./', file_name='chu',
+        xlim=None, axes_position=[]):
     """
     Produces a CHU plot from the provided input file.
 
@@ -104,7 +110,7 @@ def make_chu_plot(hk_file, fig_dir='./', file_name='chu',
     # Use the first and last times in the dataset for the full-range x-axis.
     x_min = ptools.matplotlib.dates.num2date(cdates[0])
     x_max = ptools.matplotlib.dates.num2date(cdates[-1])
-    start = x_min.strftime(utilities.DATE_STR_FORMAT)
+    start = x_min.strftime('%Y-%m-%d %H:%M:%S')
     start_yyyymmdd, start_hhmmss = start.split(' ')
 
     if axes_position:
@@ -115,16 +121,17 @@ def make_chu_plot(hk_file, fig_dir='./', file_name='chu',
         fig, ax = ptools.plt.subplots()
         ax.set_title(f'NuSTAR {start_yyyymmdd} CHU States')
 
-    ax.legend_ = None # Turn the legend off
-    ax.plot_date(cdates, newmask, color='sienna', linewidth=2, marker='+') # Plot the data, solid line with markers off
+    ax.legend_ = None  # Turn the legend off
+    # Plot the data, solid line with markers off
+    ax.plot_date(cdates, newmask, color='sienna', linewidth=2, marker='+')
 
     # Configure the ax limits and labels.
     ptools.set_x_ticks(ax, x_min, x_max)
     ptools.set_y_ticks(ax, b_minor_ticks=False)
 
-    ax.set(ylabel='CHU State', yticklabels=[' ','1','2','12','3','13','23','123',' '],
-        yticks=np.arange(0, 9, 1.0), ylim=[0.5, 7.5])
-    
+    ax.set(ylabel='CHU State', yticklabels=[' ', '1', '2', '12', '3', '13', '23', '123', ' '],
+           yticks=np.arange(0, 9, 1.0), ylim=[0.5, 7.5])
+
     # Save the full unmodified CHU plot.
     if not axes_position:
         print(f'Saving CHU plot to {fig_dir}{file_name}_full')
@@ -155,5 +162,6 @@ def generate_chus(id_dir):
 
     # Create a CHU plot using the specified data files.
     gz_dat_file = f'{id_dir}hk/nu{obs_id}_chu123.fits.gz'
-    unzipped_data_file = utilities.gunzip_file(gz_dat_file) # Ensure the data is unzipped
+    unzipped_data_file = utilities.gunzip_file(
+        gz_dat_file)  # Ensure the data is unzipped
     make_chu_plot(unzipped_data_file, fig_dir=fig_dir)

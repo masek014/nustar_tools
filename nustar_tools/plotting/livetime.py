@@ -1,24 +1,33 @@
+import datetime
+import math
+
 import astropy.units as u
+import numpy as np
+
+from astropy.time import Time
 
 from . import tools as ptools
 from ..utils import utilities
 
 
-DATA_EXTENSIONS = ['A_fpm.hk.gz', 'B_fpm.hk.gz'] # File extensions of the zipped livetime data
+# File extensions of the zipped livetime data
+DATA_EXTENSIONS = ['A_fpm.hk.gz', 'B_fpm.hk.gz']
 
 
 def get_livetime_data(hk_file, time_edges):
 
-    hk_data, hk_hdr = utilities.get_event_data(hk_file, b_filter_far_data=False)
+    hk_data, hk_hdr = utilities.get_event_data(
+        hk_file, perform_filter=False)
     hk_times = hk_data['time']
     hk_livetimes = hk_data['livetime']
-        
+
     # Get the average livetime correction for each of the bins from the housekeeping file livetime times.
-    livetimes = ptools.np.zeros(len(time_edges)-1)
+    livetimes = np.zeros(len(time_edges)-1)
     for t in range(len(time_edges)-1):
-        within_time = ((hk_times>=time_edges[t]) & (hk_times<time_edges[t+1]))
+        within_time = ((hk_times >= time_edges[t]) & (
+            hk_times < time_edges[t+1]))
         livetimes_in_range = hk_livetimes[within_time]
-        livetimes[t] = ptools.np.average(livetimes_in_range)
+        livetimes[t] = np.average(livetimes_in_range)
 
     return livetimes
 
@@ -41,21 +50,23 @@ def compute_average_livetime(hk_file, time_range):
         The average livetime as a fraction of the total time,
         i.e., multiply by 100 to get livetime percent.
     """
-    
-    x_min = utilities.convert_string_to_datetime(time_range[0])
-    x_max = utilities.convert_string_to_datetime(time_range[1])
 
-    hk_data, hk_hdr = utilities.get_event_data(hk_file, b_filter_far_data=False)
+    # x_min = utilities.convert_string_to_datetime(time_range[0])
+    # x_max = utilities.convert_string_to_datetime(time_range[1])
+    x_min = Time(time_range[0], scale='utc').datetime
+    x_max = Time(time_range[1], scale='utc').datetime
 
-    mjdref = utilities.Time(hk_hdr['mjdrefi'], format='mjd', scale='utc')
-    ltims_dt = utilities.Time(mjdref+hk_data['time']*u.s, format='mjd', scale='utc').datetime
-    for i in range(len(ltims_dt)):
-        ltims_dt[i] = ltims_dt[i].replace(tzinfo=utilities.timezone.utc)
+    hk_data, hk_hdr = utilities.get_event_data(
+        hk_file, perform_filter=False)
+
+    mjdref = Time(hk_hdr['mjdrefi'], format='mjd', scale='utc')
+    ltims_dt = Time(
+        mjdref+hk_data['time']*u.s, format='mjd', scale='utc').datetime
 
     livetime = hk_data['livetime']
-    inds = ( (ltims_dt>x_min) & (ltims_dt<x_max))
+    inds = ((ltims_dt > x_min) & (ltims_dt < x_max))
 
-    avg_livetime = round(ptools.np.average(livetime[inds]), 4)
+    avg_livetime = round(np.average(livetime[inds]), 4)
 
     return avg_livetime
 
@@ -72,7 +83,7 @@ def find_deadtimes(times, counts):
         The time edges of the frames.
     counts : np array
         The counts for each bin.
-    
+
     Returns
     -------
     deadtimes : list of lists
@@ -80,7 +91,7 @@ def find_deadtimes(times, counts):
         Each element in the list is a list defining the interval [start, end].
     """
 
-    deadtimes = [] # A list of lists
+    deadtimes = []  # A list of lists
     begin_deadtime = ''
     end_deadtime = ''
     deadtime_found = False
@@ -127,16 +138,16 @@ def find_saa_and_eclipses(times, vals, avg_width=15):
         List of lists containing the start time and end time pairs.
     """
 
-    deadtimes = [] # A list of lists
+    deadtimes = []  # A list of lists
     begin_deadtime = None
     end_deadtime = None
     deadtime_found = False
 
-    eclipses = [] # A list of lists 
+    eclipses = []  # A list of lists
     begin_eclipse = None
     end_eclipse = None
     eclipse_found = False
-    
+
     for i, lt in enumerate(vals, start=avg_width-1):
 
         # Check for SAA deadtime.
@@ -147,22 +158,22 @@ def find_saa_and_eclipses(times, vals, avg_width=15):
             end_deadtime = times[i-avg_width+1]
             deadtime_found = False
             deadtimes.append([begin_deadtime, end_deadtime])
-        
+
         # Check for eclipse.
         if i >= vals.size:
             break
         sum = 0
-        for j in range(i-avg_width+1, i+1):   
+        for j in range(i-avg_width+1, i+1):
             sum = sum + vals[j]
         avg = sum / avg_width
         if avg >= 0.9 and not eclipse_found:
-            begin_eclipse = times[i-avg_width+utilities.math.ceil(avg_width/2)]
+            begin_eclipse = times[i-avg_width+math.ceil(avg_width/2)]
             eclipse_found = True
         elif avg < 0.9 and eclipse_found:
-            end_eclipse = times[i-avg_width+utilities.math.ceil(avg_width/2)]
+            end_eclipse = times[i-avg_width+math.ceil(avg_width/2)]
             eclipse_found = False
             eclipses.append([begin_eclipse, end_eclipse])
-    
+
     # Handle the case if the data set ends during a dead period.
     if deadtime_found:
         end_deadtime = times[-1]
@@ -177,7 +188,7 @@ def find_saa_and_eclipses(times, vals, avg_width=15):
 
 
 def make_livetime_plot(hk_file, fig_dir='./', file_name='livetime',
-    xlim=None, axes_position=[], conf_file=utilities.CONF_FILE):
+                       xlim=None, axes_position=[], conf_file=utilities.CONF_FILE):
     """
     Produces a CHU plot from the provided input file.
 
@@ -200,7 +211,6 @@ def make_livetime_plot(hk_file, fig_dir='./', file_name='livetime',
     """
 
     LIVE_CONFIG = {}
-    # utilities.apply_config_settings(LIVE_CONFIG, 'LivetimeSettings', conf_file)
     ptools.apply_style()
 
     id_dir = utilities.get_id_dir_from_hk_file(hk_file)
@@ -211,12 +221,12 @@ def make_livetime_plot(hk_file, fig_dir='./', file_name='livetime',
         ldata = llist[1].data
         lhdr = llist[1].header
 
-    mjdref=utilities.Time(lhdr['mjdrefi'], format='mjd')
-    ltims=utilities.Time(mjdref+ldata['time']*u.s, format='mjd')
+    mjdref = Time(lhdr['mjdrefi'], format='mjd')
+    ltims = Time(mjdref+ldata['time']*u.s, format='mjd')
 
     livetimes = ldata['livetime']
     obs_date = (ltims.datetime)[0].strftime('%Y/%m/%d')
-    
+
     # Convert to format matplotlib can handle, going astropytime -> datetime -> matplotlibdates.
     dates = ptools.matplotlib.dates.date2num(ltims.datetime)
 
@@ -225,24 +235,24 @@ def make_livetime_plot(hk_file, fig_dir='./', file_name='livetime',
     else:
         fig, ax = ptools.plt.subplots()
         ax.set_title(f'NuSTAR FPM {in_fpm} Livetime - {obs_date}')
-    ax.legend_ = None # Turn the legend off
+    ax.legend_ = None  # Turn the legend off
 
     # Plot the data as a solid line with markers off.
     ax.plot_date(dates, livetimes, color='purple', linestyle='solid',
-        marker='', drawstyle='steps')
+                 marker='', drawstyle='steps')
 
     avg_width = 20
     saa, eclipses = find_saa_and_eclipses(dates, livetimes, avg_width)
-        
+
     # Add the saa lines.
     for pair in saa:
-        ax.axvline(x=pair[0], linestyle = 'dashed', color='red')
-        ax.axvline(x=pair[1], linestyle = 'dashed', color='red')
+        ax.axvline(x=pair[0], linestyle='dashed', color='red')
+        ax.axvline(x=pair[1], linestyle='dashed', color='red')
 
     # Add the eclipse lines.
     for pair in eclipses:
-        ax.axvline(x=pair[0], linestyle = 'dashed', color='blue')
-        ax.axvline(x=pair[1], linestyle = 'dashed', color='blue')    
+        ax.axvline(x=pair[0], linestyle='dashed', color='blue')
+        ax.axvline(x=pair[1], linestyle='dashed', color='blue')
 
     # Here, x_min and x_max will include the entire livetime data,
     # including the SAA passings and eclipses.
@@ -270,7 +280,7 @@ def make_livetime_plot(hk_file, fig_dir='./', file_name='livetime',
         if not axes_position:
             print(f'Saving livetime plot to {fig_dir}{file_name}')
             ptools.save_plot(fig, fig_dir, file_name)
-    
+
     return ax
 
 
@@ -286,5 +296,6 @@ def generate_livetime_plots(id_dir):
     # Create a livetime plot for both the A and B sets.
     for ext in DATA_EXTENSIONS:
         gz_dat_file = f'{id_dir}hk/nu{obs_id}{ext}'
-        unzipped_data_file = utilities.gunzip_file(gz_dat_file) # Ensure the data is unzipped
+        unzipped_data_file = utilities.gunzip_file(
+            gz_dat_file)  # Ensure the data is unzipped
         make_livetime_plot(unzipped_data_file, fig_dir=fig_dir)

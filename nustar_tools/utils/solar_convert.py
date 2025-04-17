@@ -5,7 +5,8 @@ from nustar_pysolar import convert
 
 from . import utilities
 
-EVENT_DATA_EXTENSIONS = ['A06_cl.evt', 'B06_cl.evt'] # File extensions of the event data
+# File extensions of the event data
+EVENT_DATA_EXTENSIONS = ['A06_cl.evt', 'B06_cl.evt']
 
 
 def convert_to_solar_coords(in_file):
@@ -23,11 +24,11 @@ def convert_to_solar_coords(in_file):
     # Make the new filename.
     (sfile, ext) = splitext(in_file)
     out_file = sfile + '_sunpos.evt'
-    
+
     # Only do the conversion if the output file does not exist.
     if not isfile(out_file):
         print(f'Converting {in_file} to solar coordinates')
-        evtdata, hdr = utilities.get_event_data(in_file, b_filter_far_data=False)
+        evtdata, hdr = utilities.get_event_data(in_file, perform_filter=False)
         importlib.reload(convert)
         (newdata, newhdr) = convert.to_solar(evtdata, hdr)
         utilities.fits.writeto(out_file, newdata, newhdr)
@@ -45,7 +46,8 @@ def generate_solar_data(id_dir):
         Directory of the data ID. Ex: /Users/rbmasek/nustar/data/20210108/20612001001/
     """
 
-    dat_id = id_dir[utilities.find_nth(id_dir, '/', id_dir.count('/') - 1) + 1:-1]
+    dat_id = id_dir[utilities.find_nth(
+        id_dir, '/', id_dir.count('/') - 1) + 1:-1]
     for ext in EVENT_DATA_EXTENSIONS:
         dat_file = id_dir + 'event_cl/' + 'nu' + dat_id + ext
         convert_to_solar_coords(dat_file)

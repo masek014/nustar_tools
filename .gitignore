@@ -4,6 +4,7 @@ docs/
 nustar_tools.egg-info/
 __pycache__/
 test_files/
+examples/
 
 *.bsp
 *.tle

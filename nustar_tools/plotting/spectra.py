@@ -5,7 +5,7 @@ import os
 
 from astropy.io import fits
 
-from ..utils import utilities
+from ..utils import time_tools, utilities
 from ..plotting import tools as ptools
 
 
@@ -29,28 +29,29 @@ def array_livetime_correction(hk_file, counts, time_edges):
         The livetime corrected count rates.
     """
 
-
     # Get the livetimes for the observation.
-    hk_data, hk_hdr = utilities.get_event_data(hk_file, b_filter_far_data=False)
+    hk_data, hk_hdr = utilities.get_event_data(
+        hk_file, perform_filter=False)
     hk_times = hk_data['time']
     hk_livetimes = hk_data['livetime']
-    
+
     # Get the average livetime correction for each of the bins from the housekeeping file livetime times.
     time_diff = np.diff(time_edges)
     count_rates = counts.copy()
     livetimes = np.zeros(len(time_edges)-1)
     for t in range(len(time_edges)-1):
-        within_time = ((hk_times>=time_edges[t]) & (hk_times<time_edges[t+1]))
+        within_time = ((hk_times >= time_edges[t]) & (
+            hk_times < time_edges[t+1]))
         livetimes_in_range = hk_livetimes[within_time]
         livetimes[t] = np.average(livetimes_in_range)
-        count_rates[t,:] = count_rates[t,:]/(livetimes[t] * time_diff[t])
+        count_rates[t, :] = count_rates[t, :]/(livetimes[t] * time_diff[t])
 
     return count_rates
 
 
-def plot_spectrogram(evt_data, time_range=None, energy_range=(3,10),
-    num_bins=20, cmap = plt.cm.jet, hk_file=None, b_livetime_correction=False,
-    title_append='', fig_dir='./', file_name='spectrogram'):
+def plot_spectrogram(evt_data, time_range=None, energy_range=(3, 10),
+                     num_bins=20, cmap=plt.cm.jet, hk_file=None, b_livetime_correction=False,
+                     title_append='', fig_dir='./', file_name='spectrogram'):
     """
     Make and plot a spectrogram of the provided data.
 
@@ -95,22 +96,22 @@ def plot_spectrogram(evt_data, time_range=None, energy_range=(3,10),
     times = evt_data['TIME']
     pis = evt_data['PI']
     energies = utilities.convert_pi_to_energy(pis)
-    
+
     if time_range is not None:
         time_range = (
-            utilities.convert_string_to_nustar_time(time_range[0]),
-            utilities.convert_string_to_nustar_time(time_range[1])
+            time_tools.string_to_nustar(time_range[0]),
+            time_tools.string_to_nustar(time_range[1])
         )
     else:
         time_range = [times[0], times[-1]]
 
-    x_min = utilities.convert_nustar_time_to_datetime(time_range[0])
-    x_max = utilities.convert_nustar_time_to_datetime(time_range[1])
+    x_min = time_tools.nustar_to_datetime(time_range[0])
+    x_max = time_tools.nustar_to_datetime(time_range[1])
 
     H, xedges, yedges = np.histogram2d(times, energies,
-        bins=(num_bins*2, num_bins),
-        range=(time_range, energy_range)
-    )
+                                       bins=(num_bins*2, num_bins),
+                                       range=(time_range, energy_range)
+                                       )
 
     title_str = f'Spectrogram{title_append}'
     cbar_str = 'Counts'
@@ -126,14 +127,14 @@ def plot_spectrogram(evt_data, time_range=None, energy_range=(3,10),
     # Convert the x-edges into datetime format.
     to_datetime = np.vectorize(datetime.datetime.fromtimestamp)
     xedges_datetime = to_datetime(xedges, tz=datetime.timezone.utc)
-    
+
     # Make the plot.
     fig, ax = plt.subplots()
     norm_max = max(2, np.nanmax(H))
     norm = ptools.matplotlib.colors.LogNorm(1, norm_max)
     spectrogram = ax.pcolor(xedges_datetime, yedges, H.T,
-        cmap=cmap, norm=norm
-    )
+                            cmap=cmap, norm=norm
+                            )
 
     ax.set(ylabel='Energy [keV]', title=title_str)
     ptools.set_x_ticks(ax, x_min, x_max)
@@ -145,7 +146,7 @@ def plot_spectrogram(evt_data, time_range=None, energy_range=(3,10),
 
 
 def plot_photon_spectrum(evt_data, energy_range=None, bin_width=0.2,
-        fig_dir='./', file_name='photon_spectrum'):
+                         fig_dir='./', file_name='photon_spectrum'):
     """
     Make and plot a photon spectrum of the provided data.
 
@@ -178,14 +179,14 @@ def plot_photon_spectrum(evt_data, energy_range=None, bin_width=0.2,
         energy_range = (np.floor(np.min(energies)), np.ceil(np.max(energies)))
 
     num_bins = int((energy_range[1]-energy_range[0])/bin_width)
-    
+
     fig, ax = plt.subplots()
     counts, edges = np.histogram(energies, bins=num_bins, range=energy_range)
     ax.stairs(counts, edges, color='purple', label=f'{energy_range} keV')
 
     ax.set(xlabel='Energy (keV)', ylabel='Counts',
-        title=f'Photon spectrum {energy_range} keV - {bin_width} keV step',
-        xlim=energy_range, yscale='log')
+           title=f'Photon spectrum {energy_range} keV - {bin_width} keV step',
+           xlim=energy_range, yscale='log')
     ax.xaxis.set_minor_locator(ptools.matplotlib.ticker.AutoMinorLocator(5))
 
     if energy_range[0] < 2.5 and energy_range[1] > 2.5:
@@ -229,7 +230,7 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
     pha_files, labels = [], []
     sorted_dir = os.listdir(in_dir)
     sorted_dir.sort()
-    
+
     # Put grade 0 first (sorting doesn't work due to how Python sorts).
     for f in sorted_dir:
         if f.endswith('_sr.pha') and f'{fpm}06' in f:
@@ -243,7 +244,7 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
     title_str = ''
     fig, ax = plt.subplots()
     for f, c, l in zip(pha_files, colors, labels):
-        
+
         with fits.open(f) as hdu:
             hdr, evt = hdu[1].header, hdu[1].data
         bins, counts = evt['CHANNEL'], evt['COUNTS']
@@ -251,11 +252,16 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
 
         ax.step(bins, counts, color=c, label=l)
 
-        start_time = utilities.convert_nustar_time_to_string(hdr['TSTART'])
-        end_hhmmss = utilities.convert_nustar_time_to_string(hdr['TSTOP']).split(' ')[1]
+        start_time = time_tools.nustar_to_astropy(
+            hdr['TSTART']).strftime('%Y-%m-%d %H:%M:S')
+        end_hhmmss = time_tools.nustar_to_astropy(
+            hdr['TSTOP'].strftime('%H:%M:%S'))
         title_str = 'Grade Spectra ' + start_time + '-' + end_hhmmss
+        title_str = f'Grade Spectra {start_time} - {end_hhmmss}'
 
-    ax.set(xlabel='Energy (keV)', ylabel='Counts', title=title_str, yscale='log', xlim=(0,15))
+    ax.set(
+        xlabel='Energy (keV)', ylabel='Counts',
+        title=title_str, yscale='log', xlim=(0, 15))
 
     # Add the corrected line, if applicable.
     g0_file, g_unphysical_file = None, None
@@ -276,7 +282,8 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
             evt = hdu[1].data
         g_unphysical_counts = evt['COUNTS']
 
-        ax.step(bins, g0_counts-0.25*g_unphysical_counts, color='cyan', label='G0 - 0.25*G21-24')
+        ax.step(bins, g0_counts-0.25*g_unphysical_counts,
+                color='cyan', label='G0 - 0.25*G21-24')
 
     ax.legend()
 
