@@ -24,7 +24,7 @@ from scipy import ndimage
 from ..utils import utilities
 
 
-STYLES_DIR = f'{utilities.os.path.dirname(utilities.os.path.realpath(__file__))}/styles/'
+STYLES_DIR = f'{os.path.dirname(os.path.realpath(__file__))}/styles/'
 
 
 def apply_style():

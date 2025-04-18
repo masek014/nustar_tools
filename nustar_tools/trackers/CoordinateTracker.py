@@ -1,12 +1,15 @@
-import astropy.units as u
 import datetime
+import os
+import pathlib
+import pickle
+
+import astropy.units as u
 import matplotlib.animation as animation
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 import nustar_pysolar as nustar
-import os
-import photutils
+import photutils.centroids
 import ruptures as rpt
 
 from astropy.io import fits
@@ -14,7 +17,6 @@ from astropy.table import QTable, Column
 from astropy.time import Time
 from matplotlib.collections import PathCollection
 from scipy.fft import fft, fftfreq
-
 
 from ..pixels import PixelArray as pa
 from ..plotting import tools as ptools
@@ -28,16 +30,18 @@ OA_FILE_PATH_FORMAT = '{id_dir}/event_cl/nu{id_num:11}{fpm}_oa.fits'
 DET1_FILE_PATH_FORMAT = '{id_dir}/event_cl/nu{id_num:11}{fpm}_det1.fits'
 
 
+STYLES_DIR = pathlib.Path(__file__).absolute().parent / 'styles'
+plt.style.use(STYLES_DIR / 'tracker.mplstyle')
+
+
 def general_xy_to_radec(x, y, evt_hdr):
-    """
-    A generalized version of nustar_pysolar.convert._xy_to_radec
+    '''A generalized version of nustar_pysolar.convert._xy_to_radec
     that works with any of the NuSTAR time series coordinate data
     (e.g. the optical axis position).
 
     Conversion function to go from X/Y coordinates
     in the FITS file to RA/Dec coordinates.
-    """
-
+    '''
     for field in evt_hdr.keys():
         if field.find('TYPE') != -1:
             if evt_hdr[field] == 'X':
@@ -63,7 +67,7 @@ def general_xy_to_radec(x, y, evt_hdr):
 
 
 # TODO: What should tStep be? Do we need to account for the motion/rotation of the Sun?
-def radec_to_solar(times, ra, dec):
+def radec_to_solar(times, ra, dec) -> tuple[u.Quantity, u.Quantity]:
 
     x, y = nustar.convert._delta_solar_skyfield(
         ra, dec, Time(times), tStep=1e6)
@@ -72,10 +76,9 @@ def radec_to_solar(times, ra, dec):
     return x, y
 
 
-def make_sky_pixel_array(evt_data):
+def make_sky_pixel_array(evt_data) -> np.ndarray:
 
     arr = [[0 for _ in range(1000)] for _ in range(1000)]
-
     for evt in evt_data:
         x, y = evt['X'], evt['Y']
         # det_arrs[det][y][x].append(evt) # Track the photon lists
@@ -87,8 +90,7 @@ def make_sky_pixel_array(evt_data):
 # TODO: Move this to utilities.py (or someplace).
 # TODO: Copy this chunk from the updates nustar_pysolar.
 def make_sunpy_array(evtdata, hdr, exp_time=0, on_time=0, shevt_xy=[0, 0]):
-    """
-    This is the portion of the method make_sunpy_map from nustar_pysolar
+    '''This is the portion of the method make_sunpy_map from nustar_pysolar
     that creates the data array for the Sunpy map.
 
     Parameters
@@ -116,9 +118,7 @@ def make_sunpy_array(evtdata, hdr, exp_time=0, on_time=0, shevt_xy=[0, 0]):
     -------
     H : np.array
         The data array of NuSTAR data.
-
-
-    """
+    '''
 
     # Parse header keywords
     for field in list(hdr.keys()):
@@ -165,7 +165,7 @@ def get_observation_time(
     id_dir: str,
     fpm: str
 ) -> tuple[datetime.datetime, datetime.datetime]:
-    """
+    '''
     Reads the first and last time from the photon list corresponding
     to the provided observation ID and FPM.
 
@@ -180,8 +180,7 @@ def get_observation_time(
     -------
     time_range : tuple of datetime
         The time range defining the observation interval.
-    """
-
+    '''
     id_dir = utilities.verify_path(id_dir)
     id_num = utilities.get_id_from_id_dir(id_dir)
     evt_file = utilities.EVT_FILE_PATH_FORMAT.format(
@@ -223,40 +222,41 @@ class CoordinateTracker():
 
     @property
     def timestep(self) -> u.Quantity:
+        '''Time between each timestamp.'''
         return (self.times[1] - self.times[0]).total_seconds() * u.s
 
     @property
     def times(self) -> Column[u.Quantity]:
+        '''Timestamps for each data point.'''
         return self._coords['TIME']
 
     @property
     def x(self) -> u.Quantity:
+        '''x coordinate data.'''
         return self._coords[self.x_key]
 
     @property
     def y(self) -> u.Quantity:
+        '''y coordinate data.'''
         return self._coords[self.y_key]
 
     @property
     def x_key(self) -> str | None:
-
+        '''Key used for the x coordinate data.'''
         for key in self.data_keys:
             if 'X' in key.upper():
                 return key
 
     @property
     def y_key(self) -> str | None:
-
+        '''Key used for the y coordinate data.'''
         for key in self.data_keys:
             if 'Y' in key.upper():
                 return key
 
     @property
     def unit(self) -> str:
-        """
-        The unit defined in the FITS header.
-        """
-
+        '''The unit defined in the FITS header.'''
         for k in self.hdr.keys():
             if self.hdr[k] == self.data_keys[-1]:
                 num = k[5:8]
@@ -264,18 +264,17 @@ class CoordinateTracker():
 
     @property
     def date(self) -> str:
-        """
-        YYYYMMDD
-        """
+        '''Date in YYYYMMDD format'''
         p = utilities.parse.parse(utilities.ID_DIR_PATH_FORMAT, self.id_dir)
         return p['date']
 
     @property
     def observation_time(self) -> tuple[datetime.datetime, datetime.datetime]:
+        '''Observation interval for the dataset.'''
         return get_observation_time(self.id_dir, self.fpm)
 
     def _format_pickle_path(self, out_dir: str = './', *args):
-
+        '''Format the pickle path for saving data.'''
         if not os.path.exists(out_dir):
             os.mkdir(out_dir)
         self.pickle_path = f'./{out_dir}/{self.date}_{self.id_num}'
@@ -286,35 +285,32 @@ class CoordinateTracker():
     # TODO: Move this utilities?
 
     def get_field_unit(self, field: str) -> str:
-        """
-        Returns the unit corresponding to the provided FITS header key.
-        """
-
+        '''Returns the unit corresponding to the provided FITS header key.'''
         for k in self.hdr.keys():
             if 'TTYPE' in k and self.hdr[k] == field:
                 num = k[5:8]
                 return self.hdr[f'TUNIT{num}']
 
     def load_coordinates(self):
-
-        if utilities.os.path.exists(self.pickle_path):
+        '''Load coordinate data from a pickle file.'''
+        if os.path.exists(self.pickle_path):
             print(f'Loading coordinates from pickle: {self.pickle_path}')
             with open(self.pickle_path, 'rb') as in_file:
-                self._coords = utilities.pickle.load(in_file)
+                self._coords = pickle.load(in_file)
         else:
             print(f'Pickle file does not exist: {self.pickle_path}')
 
     def save_coordinates(self):
-
+        '''Save coordinate data to a pickle file.'''
         if self._coords is not None:
             print(f'Saving coordinates to pickle: {self.pickle_path}')
             with open(self.pickle_path, 'wb') as in_file:
-                utilities.pickle.dump(self._coords, in_file)
+                pickle.dump(self._coords, in_file)
         else:
             print('Coordinates not yet calculated. Not saving to file.')
 
     def time_filter(self, time_range: tuple[datetime.datetime, datetime.datetime]):
-
+        '''Filter the data by time.'''
         obs_inds = (self.times >= time_range[0]) & (
             self.times <= time_range[1])
         self._coords = self._coords[obs_inds]
@@ -324,7 +320,10 @@ class CoordinateTracker():
         time_range: list[datetime.datetime, datetime.datetime] = None,
         by: int = 1
     ):
-
+        '''Read the data from the file. Filter by time_range, if specified.
+        by allows skipping every n data points using numpy indexing,
+        e.g. arr[::n].
+        '''
         if 'TIME' in self.data_keys:
             self.data_keys.remove('TIME')
         self.data_keys.sort()
@@ -343,59 +342,54 @@ class CoordinateTracker():
         # cols[0] = nustar.utils.convert_nustar_time(cols[0])
         cols[0] = [time_tools.nustar_to_datetime(
             t) for t in cols[0]]
-
         data = QTable(cols, names=self.data_keys, units=units)
         self._coords = data[::by]
-
         if time_range is not None:
             self.time_filter(time_range)
 
     def initialize(self):
-        """
-        Loads the coordinates from a pickle, if present.
+        '''Loads the coordinates from a pickle, if present.
         If pickle is not present, then this reads the data, then saves the coordinates.
-        """
-
+        '''
         self.load_coordinates()
         if self._coords is None:
             self.read_data()
             self.save_coordinates()
 
     def convert_to_solar(self):
-        """
-        Converts the X and Y coordinates to solar coordinates.
-        """
-
+        '''Converts the X and Y coordinates to solar coordinates.'''
         evt_file = EVT_FILE_PATH_FORMAT.format(
-            id_dir=self.id_dir, id_num=self.id_num, fpm=self.fpm
-        )
+            id_dir=self.id_dir, id_num=self.id_num, fpm=self.fpm)
         _, evt_hdr = utilities.get_event_data(evt_file)
         ra, dec = general_xy_to_radec(self.x, self.y, evt_hdr)
         x, y = radec_to_solar(self.times, ra, dec)
-
         self._coords[self.x_key] = x
         self._coords[self.y_key] = y
 
     def coordinate_scatter(
         self,
         ax: plt.Axes,
-        b_add_hist: bool = True,
+        cbax: plt.Axes | None = None,
+        add_hist: bool = True,
         **set_kwargs: dict
     ) -> PathCollection:
-
+        '''Make a scatter plot of the x,y coordinates.'''
         cmap = 'rainbow'
         norm = colors.Normalize()
-        sc = ax.scatter(self.x, self.y, c=np.arange(0, len(self.x), 1),
-                        s=5, norm=norm, cmap=cmap)
+        sc = ax.scatter(
+            self.x, self.y, c=np.arange(0, len(self.x), 1),
+            s=5, norm=norm, cmap=cmap)
         ax.set(
             xlabel=f'x-coordinate ({self.x.unit})', ylabel=f'y-coordinate ({self.y.unit})',
             xlim=[np.nanmin(self.x).value, np.nanmax(self.x).value],
             ylim=[np.nanmin(self.y).value, np.nanmax(self.y).value],
-            **set_kwargs
-        )
-        plt.colorbar(sc, ax=ax, pad=0.01, aspect=100, label='Time step')
+            **set_kwargs)
 
-        if b_add_hist:
+        (ax.get_figure()).colorbar(
+            sc, cax=cbax, pad=0.01, aspect=20, label='Time step',
+            orientation='horizontal', ticklocation='top')
+
+        if add_hist:
             ax_histx = ax.inset_axes([0, 1.025, 1, 0.1], sharex=ax)
             ax_histy = ax.inset_axes([1.025, 0, 0.1, 1], sharey=ax)
             ax_histx.tick_params(axis='x', labelbottom=False)
@@ -408,9 +402,10 @@ class CoordinateTracker():
             # bins = np.arange(-lim, lim + binwidth, binwidth)
 
             bins = 100
-            ax_histx.hist(self.x.value, bins=bins, color='black')
-            ax_histy.hist(self.y.value, bins=bins, color='black',
-                          orientation='horizontal')
+            ax_histx.hist(
+                self.x.value, bins=bins, color='black')
+            ax_histy.hist(
+                self.y.value, bins=bins, color='black', orientation='horizontal')
         else:
             ax.axis('equal')
 
@@ -421,35 +416,33 @@ class CoordinateTracker():
         ax: plt.Axes,
         which_coord: str,
         b_cpd: bool = False,
-        plot_kwargs: dict = {},
-        set_kwargs: dict = {}
+        plot_kwargs: dict | None = None,
+        set_kwargs: dict | None = None
     ) -> list[plt.Line2D]:
-        """
-        plot_kwargs specifies e.g. line color, width, etc.
+        '''plot_kwargs specifies e.g. line color, width, etc.
         set_kwargs is for the ax.set() call, e.g. xlim, ylim, etc.
-        """
-
-        default_plot_kwargs = {
-            'color': 'black',
-            'lw': 0.75
-        }
-
+        '''
+        default_plot_kwargs = {'color': 'black', 'lw': 0.75}
         default_set_kwargs = {
             'xlim': [self.times[0], self.times[-1]],
             'xlabel': 'Time',
             'ylabel': f'{which_coord.upper()} ({self.y.unit})'
         }
-
+        if plot_kwargs is None:
+            plot_kwargs = {}
         plot_kwargs = {**default_plot_kwargs, **plot_kwargs}
+        if set_kwargs is None:
+            set_kwargs = {}
         set_kwargs = {**default_set_kwargs, **set_kwargs}
 
         which_coord = which_coord.lower()
-        if which_coord == 'x':
-            coord = self.x
-        elif which_coord == 'y':
-            coord = self.y
-        elif which_coord == 'z':
-            coord = self.z
+        match which_coord:
+            case 'x':
+                coord = self.x
+            case 'y':
+                coord = self.y
+            case 'z':
+                coord = self.z
 
         line = ax.plot(self.times, coord, **plot_kwargs)
         ptools.set_x_ticks(ax)
@@ -469,27 +462,25 @@ class CoordinateTracker():
         return line
 
     def coordinate_fft(self, ax: plt.Axes):
-
+        '''Plot a fast Fourier transform on the x,y data.'''
         N = self.x.size
         tf = fftfreq(N, (self.timestep << u.s).value)[:N//2]
-
         # Remove nans.
         x = self.x.astype(float)
         x = x[~np.isnan(x)]
         y = self.y.astype(float)
         y = y[~np.isnan(y)]
-
         xf = fft(x)
         yf = fft(y)
-
-        ax.plot(tf, 2.0/N * np.abs(xf[0:N//2]), linewidth=0.75,
-                color='darkorange', label='x-coord fft')
-        ax.plot(tf, 2.0/N * np.abs(yf[0:N//2]), linewidth=0.75,
-                color='purple', label='y-coord fft')
+        ax.plot(
+            tf, 2.0/N * np.abs(xf[0:N//2]), linewidth=0.75,
+            color='darkorange', label='x-coord fft')
+        ax.plot(
+            tf, 2.0/N * np.abs(yf[0:N//2]), linewidth=0.75,
+            color='purple', label='y-coord fft')
         ax.set(
             xlabel='Frequency', ylabel='Power',
-            xscale='log', yscale='log'
-        )
+            xscale='log', yscale='log')
         ax.grid(True)
         ax.xaxis.grid(which='minor', alpha=0.2)
         ax.legend()
@@ -497,45 +488,38 @@ class CoordinateTracker():
     def make_overview(
         self,
         suptitle: str = 'Coordinate Tracker Overview',
-        b_add_fft: bool = True
+        add_fft: bool = True
     ) -> plt.Figure:
 
-        ptools.apply_style()
-
-        gridspec_kwargs = dict(
-            nrows=3, ncols=1,
-            height_ratios=[5, 1, 1],
-            left=0.1, right=0.9,
-            bottom=0.1, top=0.9,
-            wspace=0.005, hspace=0.025
-        )
-
-        if b_add_fft:
-            gridspec_kwargs['nrows'] = 4
-            gridspec_kwargs['height_ratios'] = [5, 1, 1, 3]
-
-        fig = plt.figure(
-            figsize=(8, gridspec_kwargs['nrows']*3),
-            layout='constrained'
-        )
+        gridspec_kwargs = {
+            'nrows': 4, 'ncols': 1,
+            'height_ratios': [0.25, 5, 1, 1],
+            'left': 0.1, 'right': 0.9,
+            'bottom': 0.1, 'top': 0.9,
+            'wspace': 0.005, 'hspace': 0.025
+        }
+        if add_fft:
+            gridspec_kwargs['nrows'] = 5
+            gridspec_kwargs['height_ratios'] = [0.25, 5, 1, 1, 3]
+        fig = plt.figure(layout='constrained')
         fig.suptitle(suptitle)
-
         gs = fig.add_gridspec(**gridspec_kwargs)
         shared_ax = None
 
-        ax0 = fig.add_subplot(gs[0, 0])
-        self.coordinate_scatter(ax0, b_add_hist=False)
+        cbax0 = fig.add_subplot(gs[0, 0])
+        ax0 = fig.add_subplot(gs[1, 0])
+        self.coordinate_scatter(ax0, cbax=cbax0, add_hist=False)
 
-        ax1 = fig.add_subplot(gs[1, 0], sharex=shared_ax)
+        ax1 = fig.add_subplot(gs[2, 0], sharex=shared_ax)
         self.coordinate_timeseries(
-            ax1, 'x', set_kwargs=dict(xlabel='', xticklabels=[]))
+            ax1, 'x', set_kwargs={'xlabel': '', 'xticklabels': []})
         # shared_ax = ax1
 
-        ax2 = fig.add_subplot(gs[2, 0], sharex=shared_ax)
-        self.coordinate_timeseries(ax2, 'y', set_kwargs=dict(xlabel=''))
+        ax2 = fig.add_subplot(gs[3, 0], sharex=shared_ax)
+        self.coordinate_timeseries(ax2, 'y', set_kwargs={'xlabel': ''})
 
-        if b_add_fft:
-            ax3 = fig.add_subplot(gs[3, 0])
+        if add_fft:
+            ax3 = fig.add_subplot(gs[4, 0])
             self.coordinate_fft(ax3)
 
         return fig
@@ -584,10 +568,7 @@ class AttitudeTracker(CoordinateTracker):
     # TODO: Figure out why it's saving self._coords in deg instead of arcsec.
 
     def convert_to_solar(self):
-        """
-        Convert pointing coordinates to solar coordinate frame.
-        """
-
+        '''Convert pointing coordinates to solar coordinate frame.'''
         x, y = radec_to_solar(self.times, self.x, self.y)
         self._coords['POINTING'][:, 0] = x
         self._coords['POINTING'][:, 1] = y
@@ -596,82 +577,73 @@ class AttitudeTracker(CoordinateTracker):
         self,
         ax: plt.Axes,
         which_coord: str,
-        plot_kwargs: dict = {},
-        set_kwargs: dict = {}
+        plot_kwargs: dict | None = None,
+        set_kwargs: dict | None = None
     ) -> list[plt.Line2D]:
-        """
-        plot_kwargs specifies e.g. line color, width, etc.
+        '''plot_kwargs specifies e.g. line color, width, etc.
         set_kwargs is for the ax.set() call, e.g. xlim, ylim, etc.
         which_coord specifies the X, Y, and Z coordinate, which denote
         the RA, Dec, and Angle of the attitude.
-        """
-
+        '''
         which_coord = which_coord.lower()
-        if which_coord == 'x':
-            label = 'RA'
-        elif which_coord == 'y':
-            label = 'Dec'
-        elif which_coord == 'z':
-            label = 'Angle'
-
+        match which_coord:
+            case 'x':
+                label = 'RA'
+            case 'y':
+                label = 'Dec'
+            case 'z':
+                label = 'Angle'
+            case _:
+                label = 'coord'
         default_set_kwargs = {
             'xlabel': 'Time',
             'ylabel': f'{label} ({self.y.unit})'
         }
-
+        if set_kwargs is None:
+            set_kwargs = {}
         set_kwargs = {**default_set_kwargs, **set_kwargs}
         return super().coordinate_timeseries(
-            ax,
-            which_coord,
-            plot_kwargs=plot_kwargs,
-            set_kwargs=set_kwargs
-        )
+            ax, which_coord, plot_kwargs=plot_kwargs, set_kwargs=set_kwargs)
 
     def make_overview(
         self,
         suptitle: str = 'Attitude Tracker Overview',
-        b_add_fft: bool = True
+        add_fft: bool = True
     ) -> plt.Figure:
 
-        ptools.apply_style()
+        gridspec_kwargs = {
+            'nrows': 5, 'ncols': 1,
+            'height_ratios': [0.25, 5, 1, 1, 1],
+            'left': 0.1, 'right': 0.9,
+            'bottom': 0.1, 'top': 0.9,
+            'wspace': 0.005, 'hspace': 0.025
+        }
+        if add_fft:
+            gridspec_kwargs['nrows'] = 6
+            gridspec_kwargs['height_ratios'] = [0.05, 5, 1, 1, 1, 3]
 
-        gridspec_kwargs = dict(
-            nrows=4, ncols=1,
-            height_ratios=[5, 1, 1, 1],
-            left=0.1, right=0.9,
-            bottom=0.1, top=0.9,
-            wspace=0.005, hspace=0.025
-        )
-
-        if b_add_fft:
-            gridspec_kwargs['nrows'] = 5
-            gridspec_kwargs['height_ratios'] = [5, 1, 1, 1, 3]
-
-        fig = plt.figure(
-            figsize=(8, gridspec_kwargs['nrows']*3),
-            layout='constrained'
-        )
+        fig = plt.figure(layout='constrained')
         fig.suptitle(suptitle)
-
         gs = fig.add_gridspec(**gridspec_kwargs)
         shared_ax = None
 
-        ax0 = fig.add_subplot(gs[0, 0])
-        self.coordinate_scatter(ax0, b_add_hist=False)
+        cbax0 = fig.add_subplot(gs[0, 0])
+        ax0 = fig.add_subplot(gs[1, 0])
+        self.coordinate_scatter(ax0, cbax=cbax0, add_hist=False)
 
-        ax1 = fig.add_subplot(gs[1, 0], sharex=shared_ax)
+        ax1 = fig.add_subplot(gs[2, 0], sharex=shared_ax)
         self.coordinate_timeseries(
-            ax1, 'x', set_kwargs=dict(xlabel='', xticklabels=[]))
+            ax1, 'x', set_kwargs={'xlabel': '', 'xticklabels': []})
 
-        ax2 = fig.add_subplot(gs[2, 0], sharex=shared_ax)
+        ax2 = fig.add_subplot(gs[3, 0], sharex=shared_ax)
         self.coordinate_timeseries(
-            ax2, 'y', set_kwargs=dict(xlabel='', xticklabels=[]))
+            ax2, 'y', set_kwargs={'xlabel': '', 'xticklabels': []})
 
-        ax3 = fig.add_subplot(gs[3, 0], sharex=shared_ax)
-        self.coordinate_timeseries(ax3, 'z', set_kwargs=dict(xlabel=''))
+        ax3 = fig.add_subplot(gs[4, 0], sharex=shared_ax)
+        self.coordinate_timeseries(ax3, 'z', set_kwargs={'xlabel': ''})
 
-        if b_add_fft:
-            ax4 = fig.add_subplot(gs[4, 0])
+        if add_fft:
+            ax4 = fig.add_subplot(gs[5, 0])
             self.coordinate_fft(ax4)
 
         return fig
@@ -684,11 +656,11 @@ class MastTracker(CoordinateTracker):
         super().__init__(id_dir, None, MAST_FILE_PATH_FORMAT, keys)
 
     @property
-    def x(self):
+    def x(self) -> u.Quantity:
         return self._coords['T_FBOB'][:, 0]
 
     @property
-    def y(self):
+    def y(self) -> u.Quantity:
         return self._coords['T_FBOB'][:, 1]
 
 
@@ -724,6 +696,7 @@ class Det1Tracker(CoordinateTracker):
 
 
 class CentroidTracker(CoordinateTracker):
+    '''Contains data for tracking the coordinate centroid over time.'''
 
     def __init__(
         self,
@@ -733,9 +706,7 @@ class CentroidTracker(CoordinateTracker):
         which_pixels: str,
         out_dir: str = 'centroid_coordinates'
     ):
-        """
-        which_pixels is either RAW, SKY, or SOL
-        """
+        '''which_pixels is either RAW, SKY, or SOL'''
 
         self.which_pixels = which_pixels.upper()
         if self.which_pixels == 'RAW' or self.which_pixels == 'SOL':
@@ -751,12 +722,12 @@ class CentroidTracker(CoordinateTracker):
         super().__init__(id_dir, fpm, file_format, keys)
         self.frame_length = frame_length
         self.out_dir = out_dir
-        self._format_pickle_path(out_dir, f'fpm{self.fpm}',
-                                 f'{self.frame_length}s', self.which_pixels, 'centroid')
+        self._format_pickle_path(
+            out_dir, f'fpm{self.fpm}', f'{self.frame_length}s', self.which_pixels, 'centroid')
 
-    def make_overview(self, b_add_fft: bool = True):
+    def make_overview(self, add_fft: bool = True):
         super().make_overview(
-            f'Centroid {self.which_pixels} Coordinate Overview', b_add_fft=b_add_fft)
+            f'Centroid {self.which_pixels} Coordinate Overview', add_fft=add_fft)
 
     def read_data(self, time_range: tuple = None):
 
@@ -806,8 +777,6 @@ class CentroidTracker(CoordinateTracker):
         self._coords = QTable([times, x, y], names=self.data_keys, units=units)
 
     def plot_centroid(self, time_limits: tuple[str, str] = None, b_cpd: bool = False):
-
-        ptools.apply_style()
 
         if time_limits is None:
             xlim = [self.times[0], self.times[-1]]
@@ -898,8 +867,10 @@ class TrackerAnimation():
 
     def animate(self):
 
-        self.anim = animation.FuncAnimation(self.fig, self.update_plot,
-                                            # init_func=self.initialize_plot,
-                                            frames=self.num_frames, interval=1, blit=True)
-        self.anim.save('tracker_animation_test.mp4', fps=60, dpi=80,
-                       extra_args=['-vcodec', 'libx264'])
+        self.anim = animation.FuncAnimation(
+            self.fig, self.update_plot,
+            # init_func=self.initialize_plot,
+            frames=self.num_frames, interval=1, blit=True)
+        self.anim.save(
+            'tracker_animation_test.mp4', fps=60, dpi=80,
+            extra_args=['-vcodec', 'libx264'])

@@ -1,6 +1,11 @@
+'''
+Defines a class useful for filtering out data for a specified region and plotting.
+Uses Astropy regions for doing so.
+'''
+
 import astropy.units as u
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+import matplotlib.colors as mplcolors
 import nustar_pysolar as nustar
 import numpy as np
 import sunpy.map
@@ -21,9 +26,7 @@ DATE_FORMAT = '%Y-%m-%d'
 TIME_FORMAT = '%H:%M:%S'
 LIGHTCURVE_STYLES_DIR = ptools.STYLES_DIR
 MAP_STYLES_DIR = mtools.STYLES_DIR
-# TODO: Remove this?
 PSF_FILE = '/home/reed/Documents/research/nustar/psf/nuA2dpsfen1_20100101v001.fits'
-
 FPM_CMAPS = {'A': 'Greys', 'B': 'Reds'}
 
 
@@ -102,12 +105,14 @@ class RegionSelector():
         start = self.time_range[0].strftime('%H%M%S')
         end = self.time_range[1].strftime('%H%M%S')
 
-        return f'{start}-{end}_fpm{self.fpm}_{self.energy_range[0].value}-{self.energy_range[1].value}keV'
+        return f'{start}-{end}_fpm{self.fpm}_{self.energy_range[0].value}-'\
+            f'{self.energy_range[1].value}keV'
 
     @property
     def _nustar_times(self):
         '''Timestamps in NuSTAR time (seconds since Jan. 01, 2010 00:00:00 UTC).'''
-        return [time_tools.string_to_nustar(t.strftime(f'{DATE_FORMAT} {TIME_FORMAT}')) for t in self.time_range]
+        return [time_tools.string_to_nustar(
+            t.strftime(f'{DATE_FORMAT} {TIME_FORMAT}')) for t in self.time_range]
 
     def _set_data_files(self, livetime_correction):
         '''Sets the variables for the data file paths.'''
@@ -215,8 +220,8 @@ class RegionSelector():
         plt.savefig(
             f'{self.out_dir}{self.region_label}_{fig_type}_{self._param_str}.png')
 
-    def set_energy_range(self, energy_range):
-
+    def set_energy_range(self, energy_range: tuple[u.Quantity, u.Quantity]):
+        '''Filter by the specified energy range.'''
         self.energy_range = energy_range.to(u.keV)
         self._energy_filter()
         self._make_map()
@@ -263,19 +268,18 @@ class RegionSelector():
     ) -> tuple[plt.Figure, plt.Axes, sunpy.map.GenericMap]:
         '''Makes and plots a map providing an overview of the data.'''
         region_kw = region_kw or {}
-        default_map_kw = dict(
-            b_contours=True,
-            corners=list(self._map_corners.value),
-            b_colorbar=False,
-            b_blur=True,
-            blur_size=2,
-            label='Normalized Counts',
-            norm=colors.Normalize(1, 1e3)
-        )
+        default_map_kw = {
+            'b_contours': True,
+            'corners': list(self._map_corners.value),
+            'b_colorbar': False,
+            'b_blur': True,
+            'blur_size': 2,
+            'label': 'Normalized Counts',
+            'norm': mplcolors.Normalize(1, 1e3)
+        }
         if map_kw is None:
-            map_kw = default_map_kw
-        else:
-            map_kw = {**default_map_kw, **map_kw}
+            map_kw = {}
+        map_kw = {**default_map_kw, **map_kw}
         nustar_map = maps.make_nustar_map(self.evt_data, self.hdr)
         nustar_submap, fig, ax, _ = mtools.apply_map_settings(
             nustar_map, fig=fig, index=index, **map_kw)
@@ -296,18 +300,17 @@ class RegionSelector():
     ) -> tuple[plt.Figure, plt.Axes, sunpy.map.GenericMap, dict]:
         '''Plot a map after deconvolving.'''
         region_kw = region_kw or {}
-        default_map_kw = dict(
-            b_contours=True,
-            corners=list(self._map_corners.value),
-            b_colorbar=False,
-            b_blur=False,
-            label='Normalized Counts',
-            norm=colors.Normalize(1, 1e3)
-        )
+        default_map_kw = {
+            'b_contours': True,
+            'corners': list(self._map_corners.value),
+            'b_colorbar': False,
+            'b_blur': False,
+            'label': 'Normalized Counts',
+            'norm': mplcolors.Normalize(1, 1e3)
+        }
         if map_kw is None:
-            map_kw = default_map_kw
-        else:
-            map_kw = {**default_map_kw, **map_kw}
+            map_kw = {}
+        map_kw = {**default_map_kw, **map_kw}
         oa_tracker = ct.OpticalAxisTracker(self.id_dir, self.fpm)
         oa_tracker.read_data(self.time_range)
         oa_tracker.convert_to_solar()
@@ -333,8 +336,7 @@ class RegionSelector():
     def plot_exposure_map(self) -> tuple[plt.Figure, plt.Axes]:
         '''Plot an exposure map of the region data.'''
         fig, ax = exposuremaps.plot_exposure_maps(
-            self.pixel_array.evts, self.hdr, plot_fov=False,
-            fig_dir=self.out_dir,
+            self.pixel_array.evts, self.hdr, plot_fov=False, fig_dir=self.out_dir,
             file_name=f'{self.region_label}_exposure_{self._param_str}')
 
         return fig, ax
@@ -346,39 +348,33 @@ class RegionSelector():
 
         return time_edges, values, values_err
 
-    def plot_lightcurve(self, frame_length, ax=None, **kwargs):
-
-        default_kwargs = dict(
-            title=self._make_title('')
-        )
-
+    def plot_lightcurve(self, frame_length: float, ax: plt.Axes = None, **kwargs):
+        '''Plot a lightcurve of the region data.'''
+        default_kwargs = {'title': self._make_title('')}
         kwargs = {**default_kwargs, **kwargs}
-
         fig, ax = self.pixel_array.plot_lightcurve(
-            frame_length,
-            self._nustar_times,
-            self.energy_range,
-            self.hk_file,
-            ax=ax,
-            **kwargs
-        )
+            frame_length, self._nustar_times, self.energy_range, self.hk_file,
+            ax=ax, **kwargs)
 
         return fig, ax
 
-    def plot_stacked_lightcurve(self, frame_length, energy_ranges, ax=None, **kwargs):
-
-        default_kwargs = dict(
-            cmap=FPM_CMAPS[self.fpm]
-        )
+    def plot_stacked_lightcurve(
+        self,
+        frame_length: float,
+        energy_ranges: tuple[tuple[u.Quantity, u.Quantity]],
+        ax: plt.Axes = None,
+        **kwargs
+    ) -> tuple[plt.Figure, plt.Axes]:
+        '''Plot a lightcurve of the region data in different energy ranges.
+        Calls PixelArrat.plot_lightcurve for each energy range.
+        '''
+        default_kwargs = {'cmap': FPM_CMAPS[self.fpm]}
         kwargs = {**default_kwargs, **kwargs}
-
         orig_energy_range = self.energy_range
         step = 1 / (len(energy_ranges) + 1)
-
         cmap = plt.get_cmap(kwargs.pop('cmap'))
         colors = cmap(np.linspace(step, 1-step, len(energy_ranges)))
         colors = reversed(colors)
-
         for color, energy_range in zip(colors, energy_ranges):
             try:
                 self.set_energy_range(energy_range)
@@ -387,53 +383,50 @@ class RegionSelector():
                     f'WARNING [plot_stacked_lightcurve]: {e} Skipping energy range {energy_range}')
                 continue
             fig, ax = self.pixel_array.plot_lightcurve(
-                frame_length,
-                self._nustar_times,
-                energy_range,
-                self.hk_file,
-                ax=ax,
-                color=color,
+                frame_length, self._nustar_times, energy_range, self.hk_file,
+                ax=ax, color=color,
                 label=f'{energy_range[0].value} - {energy_range[1].value} keV',
-                **kwargs
-            )
-
+                **kwargs)
         self.set_energy_range(orig_energy_range)
 
         return fig, ax
 
-    def plot_combined(self, frame_length, energy_ranges=None, lc_kwargs={}):
-
+    def plot_combined(
+        self,
+        frame_length: float,
+        energy_ranges: tuple[tuple[u.Quantity, u.Quantity]] | None = None,
+        lc_kwargs: dict | None = None
+    ) -> tuple[plt.Figure, plt.Axes, plt.Axes]:
+        '''Produced a plot with RegionSelect.plot_overview_map and
+        either RegionSelect.plot_lightcurve or
+        RegionSelect.plot_stacked_lightcurve in the same figure.
+        '''
         fig = plt.figure(figsize=(10, 14), layout='constrained')
-        gs = fig.add_gridspec(2, 1,
-                              height_ratios=(3, 1),
-                              hspace=0.0,
-                              )
+        gs = fig.add_gridspec(2, 1, height_ratios=(3, 1), hspace=0.0)
 
         plt.style.use(f'{LIGHTCURVE_STYLES_DIR}/lightcurve.mplstyle')
         _, ax_map, _ = self.plot_overview_map(fig=fig, index=gs[0, 0])
-
         ax_lc = fig.add_subplot(gs[1, 0])
-
         if self.hk_file is None:
             lc_unit = 'Counts'
         else:
             lc_unit = 'Counts/s'
-        lc_kwargs_default = dict(
-            frame_length=frame_length,
-            fig=fig,
-            ax=ax_lc,
-            title=f'Region lightcurve ({frame_length}s bins)',
-            lw=2
-        )
+        lc_kwargs_default = {
+            'frame_length': frame_length,
+            'fig': fig,
+            'ax': ax_lc,
+            'title': f'Region lightcurve ({frame_length}s bins)',
+            'lw': 2
+        }
+        if lc_kwargs is None:
+            lc_kwargs = {}
         lc_kwargs = {**lc_kwargs_default, **lc_kwargs}
         if energy_ranges is None:
             lightcurve_method = self.plot_lightcurve
         else:
             lightcurve_method = self.plot_stacked_lightcurve
             lc_kwargs['energy_ranges'] = energy_ranges
-
         lightcurve_method(**lc_kwargs)
-
         ax_lc.set_ylabel(lc_unit)
         ptools.set_x_ticks(ax_lc)
 
@@ -447,16 +440,15 @@ class RegionSelector():
         ax: plt.Axes = None,
         submap: sunpy.map.GenericMap = None,
         inset_pos: tuple[float] | list[float] = [0.4, 0.4, 0.2, 0.2],
-        map_kw: dict = {},
-        region_kw: dict = {},
-        lc_kwargs: dict = {}
+        map_kw: dict | None = None,
+        region_kw: dict | None = None,
+        lc_kwargs: dict | None = None
     ):
-
+        '''Plots a map that has an inset lightcurve for the region data.'''
         b_quantity = isinstance(inset_pos[0], u.Quantity)
         if b_quantity:
             orig_inset_pos = inset_pos
             inset_pos = self._convert_position_to_fraction(inset_pos)
-
         if fig is None:
             plt.style.use(f'{LIGHTCURVE_STYLES_DIR}/inset_lightcurve.mplstyle')
             inset_pos = self._fit_inset_pos(inset_pos)
@@ -466,8 +458,8 @@ class RegionSelector():
         # TODO: See if we can clean this part up a bit.
         if b_quantity:
             inset_pos = orig_inset_pos
-            bl = SkyCoord(*(inset_pos[0], inset_pos[1]),
-                          frame=submap.coordinate_frame)
+            bl = SkyCoord(
+                *(inset_pos[0], inset_pos[1]), frame=submap.coordinate_frame)
             tr = SkyCoord(
                 *(inset_pos[0]+inset_pos[2], inset_pos[1]+inset_pos[3]), frame=submap.coordinate_frame)
             bl = submap.wcs.world_to_pixel(bl)
@@ -478,34 +470,30 @@ class RegionSelector():
             transform = None
 
         axins = ax.inset_axes(
-            inset_pos,
-            transform=transform,
-            facecolor='white'
-        )
+            inset_pos, transform=transform, facecolor='white')
 
         if self.hk_file is None:
             lc_unit = 'ct'
         else:
             lc_unit = 'ct/s'
-        default_lc_kwargs = dict(
-            frame_length=frame_length,
-            fig=fig,
-            ax=axins,
-            title=f'Region lightcurve ({lc_unit})'
-        )
+        default_lc_kwargs = {
+            'frame_length': frame_length,
+            'fig': fig,
+            'ax': axins,
+            'title': f'Region lightcurve ({lc_unit})'
+        }
+        if lc_kwargs is None:
+            lc_kwargs = {}
         lc_kwargs = {**default_lc_kwargs, **lc_kwargs}
         if energy_ranges is None:
             lightcurve_method = self.plot_lightcurve
         else:
             lightcurve_method = self.plot_stacked_lightcurve
             lc_kwargs['energy_ranges'] = energy_ranges
-
         lightcurve_method(**lc_kwargs)
         ptools.set_x_ticks(axins)
 
-        pad_mult = 1.05
         indic_col = (0.5, 0.5, 0.5, 0.75)
-
         bottom_left = SkyCoord(
             *((self.region.center.Tx.value, self.region.center.Ty.value)
               * u.arcsec) << u.arcsec,
@@ -517,6 +505,7 @@ class RegionSelector():
             frame=submap.coordinate_frame
         )
 
+        pad_mult = 1.05
         pix_reg = self.region.to_pixel(submap.wcs).bounding_box
         width = pix_reg.ixmax - pix_reg.ixmin
         height = pix_reg.iymax - pix_reg.iymin
@@ -537,15 +526,11 @@ class RegionSelector():
 
         return fig, ax, axins, submap
 
-    def save_lightcurve(self, frame_length):
-
+    def save_lightcurve(self, frame_length: float):
+        '''Saves lightcurve data to a file.'''
         header = 'unix_time,counts,counts_err'
-
         time_edges, counts, counts_err = self.pixel_array.make_lightcurve(
-            frame_length,
-            self._nustar_times,
-            self.energy_range,
-        )
+            frame_length, self._nustar_times, self.energy_range,)
 
         # Convert timestamps to Unix time.
         dt_edges = [time_tools.nustar_to_datetime(
@@ -553,14 +538,9 @@ class RegionSelector():
         unix_edges = Time(Time(dt_edges), format='unix').value
 
         columns = [unix_edges, counts, counts_err]
-
         if self.hk_file is not None:
             time_edges, rates, rates_err = self.pixel_array.make_lightcurve(
-                frame_length,
-                self._nustar_times,
-                self.energy_range,
-                self.hk_file,
-            )
+                frame_length, self._nustar_times, self.energy_range, self.hk_file)
             header += ',count_rates,count_rates_err'
             columns += [rates, rates_err]
 

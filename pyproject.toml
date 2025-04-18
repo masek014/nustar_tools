@@ -25,9 +25,24 @@ dependencies = [
 requires = ["setuptools >= 61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+packages = [
+    "nustar_tools",
+    "nustar_tools.mapping",
+    "nustar_tools.pixels",
+    "nustar_tools.plotting",
+    "nustar_tools.regions",
+    "nustar_tools.spectra",
+    "nustar_tools.trackers",
+    "nustar_tools.utils",
+]
+
+[tool.setuptools.package-data]
+"nustar_tools.mapping" = ["styles/*"]
+"nustar_tools.plotting" = ["styles/*"]
+"nustar_tools.trackers" = ["styles/*"]
+
 [tool.setuptools.dynamic]
 version = {attr = "nustar_tools.__version__"}
 
 [tool.setuptools.packages.find]
-include = ["nustar_tools*"]
 exclude = ["*test_files"]

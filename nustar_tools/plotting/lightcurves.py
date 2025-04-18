@@ -8,12 +8,6 @@ from . import livetime
 from . import tools as ptools
 from ..utils import time_tools, utilities
 
-CONF_FILE = utilities.CONF_FILE
-LTCV_CONFIG = {
-    'PLOT_WIDTH': 12,
-    'PLOT_HEIGHT': 6
-}
-
 
 def find_min_max_macropixel_indices(macropixel_arr):
     """
