@@ -380,7 +380,9 @@ class FOV():
             x, y = np.mean(cols), np.mean(rows)
             com_sky = PixCoord(x, y).to_sky(self.data_map.wcs)
             new_region = CircleSkyRegion(com_sky, radius=region.radius)
-            if self.check_region_outside_fov(new_region) > 0:
+            test_reg = CircleSkyRegion(
+                center=new_region.center, radius=1*u.arcsec)
+            if self.check_region_outside_fov(test_reg) > 0:
                 print('WARNING: new center was outside FOV. Defaulting to input region')
                 new_region = region  # Default to original region
         else:
@@ -390,7 +392,7 @@ class FOV():
         return new_region
 
     def check_region_outside_fov(self, region: SkyRegion) -> float:
-        '''Check whether the given region center is within the FOV.
+        '''Check whether the given region extends beyond the FOV.
 
         This method uses the intersection between two regions in order
         to determine whether the FOV fully contains the provided region.
@@ -417,9 +419,7 @@ class FOV():
         -------
         The amount by which the region extends beyond the FOV. 
         '''
-        test_reg = CircleSkyRegion(
-            center=region.center, radius=1*u.arcsec)
-        reg_pix = test_reg.to_pixel((self.data_map).wcs)
+        reg_pix = region.to_pixel((self.data_map).wcs)
         fov_pix = (self.rect).to_pixel((self.data_map).wcs)
         intersection = fov_pix.intersection(reg_pix)
         intersection_mask = intersection.to_mask()
