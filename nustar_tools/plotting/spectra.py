@@ -255,7 +255,7 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
         start_time = time_tools.nustar_to_astropy(
             hdr['TSTART']).strftime('%Y-%m-%d %H:%M:S')
         end_hhmmss = time_tools.nustar_to_astropy(
-            hdr['TSTOP'].strftime('%H:%M:%S'))
+            hdr['TSTOP']).strftime('%H:%M:%S')
         title_str = 'Grade Spectra ' + start_time + '-' + end_hhmmss
         title_str = f'Grade Spectra {start_time} - {end_hhmmss}'
 
