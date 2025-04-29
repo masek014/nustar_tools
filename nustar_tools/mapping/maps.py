@@ -432,7 +432,8 @@ class FOV():
 
     def fit_region_within_edges(
         self,
-        region: CircleSkyRegion
+        region: CircleSkyRegion,
+        minimum_radius: u.Quantity = 40 * u.arcsec
     ) -> CircleSkyRegion:
         '''Fit the inital region within the FOV by reducing the radius
         if the region extends beyond the FOV edges.
@@ -441,18 +442,22 @@ class FOV():
         ----------
         region : CircleSkyRegion
             The intial region.
+        minimum_radius : u.Quantity
+            The minimum allowable radius.
 
         Returns
         -------
         The region after fitting the FOV edges.
         '''
-        # Determine how many pixels the region extends beyond the FOV edges.
-        extended_pix = self.check_region_outside_fov(region)
-        if extended_pix > 0:
-            extended_pix += 5  # Reduce it by another ~2 arcseconds to account for pixel uncertainty
-            dec_value = extended_pix * \
-                ((self.data_map).scale[0].value) * u.arcsec
-            region.radius = max(region.radius - dec_value, 10*u.arcsecond)
+        reg_pix = region.to_pixel((self.data_map).wcs)
+        fov_pix = (self.rect).to_pixel((self.data_map).wcs)
+        intersection = fov_pix.intersection(reg_pix)
+        frac = np.sum(intersection.to_mask()) / reg_pix.area
+        while (frac < 0.8) and (region.radius > minimum_radius):
+            region.radius -= 2 * u.arcsec
+            new_pix = region.to_pixel(self.data_map.wcs)
+            intersection = fov_pix.intersection(new_pix)
+            frac = np.sum(intersection.to_mask()) / new_pix.area
 
         return region
 
