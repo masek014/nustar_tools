@@ -59,7 +59,9 @@ class RawPixelAnimation():
             frame_end = frame_start + self.frame_length*u.second
             det_arrs = self.pixel_array.make_det_counts(
                 (frame_start, frame_end))
-            self.pixel_array.fig_text.set_text(f'{frame_start}-{frame_end}')
+            start = frame_start.strftime('%Y-%m-%d %H:%M:%S')
+            end = frame_end.strftime('%Y-%m-%d %H:%M:%S')
+            self.fig.suptitle(f'{start} - {end}', fontsize=8)
             for det in range(4):
                 self.mats[det].set_data(np.fliplr(det_arrs[det]))
                 self.mats[det].set_norm(None)
@@ -155,7 +157,9 @@ class RawPixelAnimationCentroid(RawPixelAnimation):
             _ = self.time_filter((frame_start, frame_end))
             det_arrs = self.pixel_array.make_det_counts(
                 (frame_start, frame_end))
-            self.fig.suptitle(f'{frame_start}-{frame_end}')
+            start = frame_start.strftime('%Y-%m-%d %H:%M:%S')
+            end = frame_end.strftime('%Y-%m-%d %H:%M:%S')
+            self.fig.suptitle(f'{start} - {end}', fontsize=8)
             for det in range(det_arrs.shape[0]):
                 self.mats[det].set_data(np.fliplr(det_arrs[det]))
                 self.mats[det].set_norm(None)

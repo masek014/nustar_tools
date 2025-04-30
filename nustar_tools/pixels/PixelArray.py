@@ -284,17 +284,16 @@ class RawPixelArray(PixelArray):
         dets = [0, 1, 2, 3]
         if axs is None:
             fig, axs = plt.subplots(
-                2, 2, figsize=(4, 4.2),
+                2, 2, figsize=(4, 4),
                 gridspec_kw={
                     'left': 0.05, 'right': 0.95,
                     'bottom': 0.05, 'top': 0.95,
-                    'wspace': 0.02, 'hspace': 0.02
-                }
-            )
+                    'wspace': 0.01, 'hspace': 0.01
+                })
 
         start = time_range[0].strftime('%Y-%m-%d %H:%M:%S')
         end = time_range[-1].strftime('%Y-%m-%d %H:%M:%S')
-        fig.suptitle(f'{start}-{end}')
+        fig.suptitle(f'{start}-{end}', fontsize=8)
         for det in dets:
             row = int(det // 2)
             # Fun way of reversing the bottom row cols :)
