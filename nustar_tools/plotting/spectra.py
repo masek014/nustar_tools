@@ -204,7 +204,7 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
     provided input directory. This method will automatically
     include data from ALL pha files in in_dir.
 
-    If grade 0 and grades 21-24 are in pha files in in_dir,
+    If grade 0-4 and grades 21-24 are in pha files in in_dir,
     then the pileup-corrected curve will automatically be
     plotted.
 
@@ -234,7 +234,7 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
     # Put grade 0 first (sorting doesn't work due to how Python sorts).
     for f in sorted_dir:
         if f.endswith('_sr.pha') and f'{fpm}06' in f:
-            if '_g0_sr' in f:
+            if '_g0-4_sr' in f:
                 pha_files.insert(0, in_dir + f)
                 labels.insert(0, 'Grade ' + f.split('_g')[1].split('_sr')[0])
             else:
@@ -264,26 +264,26 @@ def make_grade_spectra(in_dir, fig_dir, fpm, file_name='grade_spectra'):
         title=title_str, yscale='log', xlim=(0, 15))
 
     # Add the corrected line, if applicable.
-    g0_file, g_unphysical_file = None, None
-    b_has_grade0, b_has_unphysical = False, False
+    g04_file, g_unphysical_file = None, None
+    b_has_grade04, b_has_unphysical = False, False
     for f in pha_files:
-        if '_g0_sr' in f:
-            b_has_grade0 = True
-            g0_file = f
+        if '_g0-4_sr' in f:
+            b_has_grade04 = True
+            g04_file = f
         elif '_g21-24_sr' in f:
             b_has_unphysical = True
             g_unphysical_file = f
 
-    if b_has_grade0 and b_has_unphysical:
-        with fits.open(g0_file) as hdu:
+    if b_has_grade04 and b_has_unphysical:
+        with fits.open(g04_file) as hdu:
             evt = hdu[1].data
-        g0_counts = evt['COUNTS']
+        g04_counts = evt['COUNTS']
         with fits.open(g_unphysical_file) as hdu:
             evt = hdu[1].data
         g_unphysical_counts = evt['COUNTS']
 
-        ax.step(bins, g0_counts-0.25*g_unphysical_counts,
-                color='cyan', label='G0 - 0.25*G21-24')
+        ax.step(bins, g04_counts-1.25*g_unphysical_counts,
+                color='cyan', label='G0-4 - 0.25*G21-24')
 
     ax.legend()
 
