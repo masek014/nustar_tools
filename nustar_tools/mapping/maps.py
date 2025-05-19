@@ -488,6 +488,8 @@ class FOV():
                 det_map, region.to_pixel(det_map.wcs))
             if -1 in dets:
                 dets.remove(-1)
+        if region.radius.value < 25:
+            region.radius = 25 * u.arcsec
 
         return region
 
