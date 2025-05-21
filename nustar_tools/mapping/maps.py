@@ -480,6 +480,8 @@ class FOV():
         det_map = make_det_map(self.evt_data, self.hdr)
         dets = mtools.find_dets_in_region(
             det_map, region.to_pixel(det_map.wcs))
+        if -1 in dets:
+            dets.remove(-1)
         while len(dets) > 1 and region.radius.value > 25:
             # Decrement by 2.5 arcseconds per iteration since
             # each detector pixel is about 2.5 arcseconds
